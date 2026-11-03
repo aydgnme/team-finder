@@ -11,7 +11,7 @@ Implementation plans derived from the reviewed design in [../design.md](../desig
 | M2 Auth and roles | [m2-auth-and-roles.md](m2-auth-and-roles.md) | merged (#4) |
 | M2.5 Concurrency proof and docs | [m2.5-concurrency-proof.md](m2.5-concurrency-proof.md) | planned |
 | Polish bucket | [polish.md](polish.md) | planned, first to slip |
-| M3 Organization data | [m3-organization-data.md](m3-organization-data.md) | M3a in review; M3b next |
+| M3 Organization data | [m3-organization-data.md](m3-organization-data.md) | M3a merged (#5); M3b in review |
 | M4 Skills lifecycle and notifications | [m4-skills-and-notifications.md](m4-skills-and-notifications.md) | planned |
 | M5 Statistics and seed | [m5-statistics-and-seed.md](m5-statistics-and-seed.md) | planned |
 | M7 Release | [m7-release.md](m7-release.md) | planned |
