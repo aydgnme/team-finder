@@ -15,14 +15,19 @@ export function staffingRoutes(app: FastifyInstance, deps: RequestDeps, limits: 
 
   app.get<IdParams>('/api/projects/:id/candidates', async (request) => {
     const q = parse(CandidatesQuery, request.query);
-    return listCandidates(contextFor(request, deps), request.params.id, {
-      ...(q.includePartial === undefined ? {} : { includePartial: q.includePartial }),
-      ...(q.includeUnavailable === undefined ? {} : { includeUnavailable: q.includeUnavailable }),
-      ...(q.includeNearMisses === undefined ? {} : { includeNearMisses: q.includeNearMisses }),
-      ...(q.includeRollingOffWithinWeeks === undefined
-        ? {}
-        : { includeRollingOffWithinWeeks: q.includeRollingOffWithinWeeks }),
-    });
+    return listCandidates(
+      contextFor(request, deps),
+      request.params.id,
+      {
+        ...(q.includePartial === undefined ? {} : { includePartial: q.includePartial }),
+        ...(q.includeUnavailable === undefined ? {} : { includeUnavailable: q.includeUnavailable }),
+        ...(q.includeNearMisses === undefined ? {} : { includeNearMisses: q.includeNearMisses }),
+        ...(q.includeRollingOffWithinWeeks === undefined
+          ? {}
+          : { includeRollingOffWithinWeeks: q.includeRollingOffWithinWeeks }),
+      },
+      q.start,
+    );
   });
 
   app.post('/api/assignments', async (request, reply) => {

@@ -26,6 +26,7 @@ export function ProposePopover({
   roleName,
   roles,
   window,
+  mode = 'propose',
   onSubmit,
   onCancel,
 }: {
@@ -34,11 +35,13 @@ export function ProposePopover({
   roleName: string;
   roles: { id: string; name: string }[];
   window: Interval;
+  /** 'draft': adds to the scenario draft; everyone in a draft starts with the project. */
+  mode?: 'propose' | 'draft';
   onSubmit: (input: ProposalInput) => void;
   onCancel: () => void;
 }) {
   const [hours, setHours] = useState(() => defaultHours(candidate, window));
-  const [from, setFrom] = useState(() => defaultFrom(candidate, window));
+  const [from, setFrom] = useState(() => (mode === 'draft' ? window.from : defaultFrom(candidate, window)));
   const [extraRoles, setExtraRoles] = useState<string[]>([]);
   const [comment, setComment] = useState('');
   const ref = useRef<HTMLFormElement>(null);
@@ -102,17 +105,19 @@ export function ProposePopover({
             onChange={(e) => setHours(Math.max(1, Math.min(HOURS_PER_DAY, Number(e.target.value) || 1)))}
           />
         </label>
-        <label>
-          Start
-          <input
-            className="mono"
-            type="date"
-            min={window.from}
-            {...(lastDay ? { max: lastDay } : {})}
-            value={from}
-            onChange={(e) => e.target.value && setFrom(e.target.value)}
-          />
-        </label>
+        {mode === 'propose' && (
+          <label>
+            Start
+            <input
+              className="mono"
+              type="date"
+              min={window.from}
+              {...(lastDay ? { max: lastDay } : {})}
+              value={from}
+              onChange={(e) => e.target.value && setFrom(e.target.value)}
+            />
+          </label>
+        )}
       </div>
       <p className={`popover-check ${check.fits ? 'ok' : 'warn'}`} data-testid="propose-check">
         {check.fits
@@ -148,7 +153,7 @@ export function ProposePopover({
           Cancel
         </button>
         <button type="submit" className="btn btn-primary">
-          Propose <kbd>Enter</kbd>
+          {mode === 'draft' ? 'Add to draft' : 'Propose'} <kbd>Enter</kbd>
         </button>
       </div>
     </form>

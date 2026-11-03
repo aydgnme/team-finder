@@ -3,6 +3,7 @@ import { AssignmentStatus, CapacityTimeline } from './capacity.ts';
 import { HOURS_PER_DAY } from './constants.ts';
 import { Day } from './dates.ts';
 import { Availability, ExclusionReason, Reason, ROLLING_OFF_WEEKS, ScoreTerms } from './matching.ts';
+import { Verdict } from './scenarios.ts';
 import { AccessRole } from './permissions.ts';
 
 // Request and response shapes shared by apps/api (validation) and apps/web (parsing).
@@ -54,6 +55,8 @@ export const BoardAssignment = z.object({
   skills: z.array(TargetSkill),
   /** For proposals: would approving it now fit invariant 1? `null` for active ones. */
   check: ProposalCheckView.nullable(),
+  /** Committed and pending load on other projects (scenario verdict, overbooking while scrubbing). */
+  timeline: CapacityTimeline,
 });
 export type BoardAssignment = z.infer<typeof BoardAssignment>;
 
@@ -72,6 +75,8 @@ export const ProjectBoard = z.object({
     teamRoles: z.array(z.object({ roleId: Id, count: z.number() })),
   }),
   window: Interval,
+  /** Allowed starts for the scrubber (inclusive), `null` once the project has started. */
+  scrub: Interval.nullable(),
   skills: z.array(z.object({ id: Id, name: z.string() })),
   roles: z.array(z.object({ id: Id, name: z.string() })),
   assignments: z.array(BoardAssignment),
@@ -95,6 +100,8 @@ export const CandidatesQuery = z.object({
     .min(ROLLING_OFF_WEEKS.min)
     .max(ROLLING_OFF_WEEKS.max)
     .optional(),
+  /** Rank as if the project started on this day (the scrubber); must be inside the scrub range. */
+  start: Day.optional(),
 });
 
 export const CandidateView = z.object({
@@ -164,3 +171,58 @@ export type ApprovalItem = z.infer<typeof ApprovalItem>;
 
 export const ApprovalsResponse = z.object({ items: z.array(ApprovalItem) });
 export type ApprovalsResponse = z.infer<typeof ApprovalsResponse>;
+
+/** One person a draft adds to the team. */
+export const ScenarioAddition = z.object({
+  userId: Id,
+  slotRoleId: Id,
+  roleIds: z.array(Id).max(10).default([]),
+  hoursPerDay: z.number().int().min(1).max(HOURS_PER_DAY),
+});
+export type ScenarioAddition = z.input<typeof ScenarioAddition>;
+
+const Additions = z.array(ScenarioAddition).max(50);
+
+/** POST /api/projects/:id/scenarios/commit: all proposals in one transaction, all-or-nothing. */
+export const ScenarioCommitRequest = z.object({
+  start: Day,
+  additions: Additions,
+  comment: z.string().max(500).default(''),
+});
+export type ScenarioCommitRequest = z.input<typeof ScenarioCommitRequest>;
+
+export const ScenarioCommitResponse = z.object({
+  project: z.object({ startDate: Day, deadline: Day.nullable() }),
+  created: z.array(AssignmentView),
+  /** Existing team assignments moved with the project. */
+  moved: z.number(),
+});
+export type ScenarioCommitResponse = z.infer<typeof ScenarioCommitResponse>;
+
+/** POST /api/snapshots: the client sends only the draft; the server rebuilds everything else. */
+export const SnapshotRequest = z.object({ projectId: Id, start: Day, additions: Additions });
+export type SnapshotRequest = z.input<typeof SnapshotRequest>;
+
+export const SnapshotCreated = z.object({ id: Id, expiresAt: z.string() });
+
+export const SnapshotView = z.object({
+  id: Id,
+  createdAt: z.string(),
+  expiresAt: z.string(),
+  orgName: z.string(),
+  isDemo: z.boolean(),
+  project: z.object({ name: z.string(), startDate: Day, deadline: Day.nullable() }),
+  slots: z.array(
+    z.object({
+      roleName: z.string(),
+      count: z.number(),
+      members: z.array(
+        z.object({ name: z.string(), hoursPerDay: z.number(), status: z.enum(['active', 'proposed', 'draft']) }),
+      ),
+    }),
+  ),
+  missingSkills: z.array(z.string()),
+  verdict: Verdict,
+  sentence: z.string(),
+});
+export type SnapshotView = z.infer<typeof SnapshotView>;

@@ -6,6 +6,7 @@ import { registerResolveActor, type RequestDeps } from './http/actor.ts';
 import { registerErrorHandling } from './http/errors.ts';
 import { createLimiter, type RateLimit } from './http/rate-limit.ts';
 import { demoRoutes } from './routes/demo.ts';
+import { scenarioRoutes } from './routes/scenarios.ts';
 import { staffingRoutes } from './routes/staffing.ts';
 
 export interface RateLimits {
@@ -92,6 +93,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
     mutations,
   });
   staffingRoutes(app, deps, { mutations });
+  scenarioRoutes(app, deps, { mutations });
 
   return app;
 }

@@ -6,7 +6,8 @@ interface Toast {
   tone: 'info' | 'error';
 }
 
-const Ctx = createContext<(text: string, tone?: Toast['tone']) => void>(() => {});
+type Announce = (text: string, tone?: Toast['tone'], options?: { toast?: boolean }) => void;
+const Ctx = createContext<Announce>(() => {});
 
 /**
  * One aria-live region for the whole app ("Mira proposed for Backend. Coverage 100%.") plus a
@@ -16,10 +17,11 @@ export function AnnouncerProvider({ children }: { children: ReactNode }) {
   const [message, setMessage] = useState('');
   const [toasts, setToasts] = useState<Toast[]>([]);
   const next = useRef(0);
-  const announce = useCallback((text: string, tone: Toast['tone'] = 'info') => {
+  const announce = useCallback<Announce>((text, tone = 'info', options) => {
     // Re-setting identical text would not be re-announced; clear first.
     setMessage('');
     requestAnimationFrame(() => setMessage(text));
+    if (options?.toast === false) return;
     const id = ++next.current;
     setToasts((t) => [...t.slice(-2), { id, text, tone }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 6000);

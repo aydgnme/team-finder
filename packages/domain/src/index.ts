@@ -6,3 +6,4 @@ export * from './errors.ts';
 export { HealthResponse } from './health.ts';
 export * from './matching.ts';
 export * from './permissions.ts';
+export * from './scenarios.ts';

@@ -24,6 +24,8 @@ export interface PermissionResources {
   'assignment.decide': InOrg & { approverId: string | null };
   'approvals.list': InOrg;
   'demo.switchPersona': InOrg & { isDemo: boolean };
+  /** Share a draft as a read-only snapshot (and read one of a real org). */
+  'snapshot.share': InOrg;
 }
 export type Action = keyof PermissionResources;
 
@@ -36,6 +38,8 @@ const RULES: { [A in Action]: (actor: Actor, resource: PermissionResources[A]) =
     has(actor, 'deptManager') && a.approverId !== null && a.approverId === actor.userId,
   'approvals.list': (actor) => has(actor, 'deptManager'),
   'demo.switchPersona': (actor, target) => actor.isDemo && target.isDemo,
+  // Snapshots show who is allocated where: people who staff or approve, never plain employees.
+  'snapshot.share': (actor) => has(actor, 'projectManager') || has(actor, 'deptManager') || has(actor, 'admin'),
 };
 
 /** Pure permission check. Cross-org access is always denied, whatever the role. */

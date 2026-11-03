@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 
-export type Route = { name: 'canvas'; projectId: string | null } | { name: 'approvals' };
+export type Route =
+  { name: 'canvas'; projectId: string | null } | { name: 'approvals' } | { name: 'snapshot'; id: string };
 
 function parse(hash: string): Route {
   if (hash.startsWith('#/approvals')) return { name: 'approvals' };
+  const snap = /^#\/s\/([^/?]+)/.exec(hash);
+  if (snap) return { name: 'snapshot', id: decodeURIComponent(snap[1]!) };
   const m = /^#\/projects\/([^/?]+)/.exec(hash);
   return { name: 'canvas', projectId: m ? decodeURIComponent(m[1]!) : null };
 }
@@ -22,6 +25,7 @@ export function useRoute(): Route {
 export const href = {
   canvas: (projectId: string) => `#/projects/${encodeURIComponent(projectId)}`,
   approvals: () => '#/approvals',
+  snapshot: (id: string) => `#/s/${encodeURIComponent(id)}`,
 };
 
 export function navigate(to: string) {

@@ -12,7 +12,7 @@ import {
   type AssignmentView,
 } from '@team-finder/domain';
 import type { z } from 'zod';
-import type { AssignmentDoc } from '../db/documents.ts';
+import type { AssignmentDoc, ProjectDoc } from '../db/documents.ts';
 import type { DbSession } from '../db/org-repo.ts';
 import type { ServiceContext } from './context.ts';
 import {
@@ -40,7 +40,80 @@ export function toAssignmentView(a: AssignmentDoc): AssignmentView {
   };
 }
 
-const invalid = (path: string, message: string): never => fail('VALIDATION', { issues: [{ path, message }] });
+export const invalid = (path: string, message: string): never => fail('VALIDATION', { issues: [{ path, message }] });
+
+export interface ProposalInput {
+  userId: string;
+  slotRoleId: string;
+  roleIds: readonly string[];
+  hoursPerDay: number;
+  from: string;
+  comment: string;
+}
+
+/**
+ * The checks and insert behind every new proposal (single propose and scenario commit). Must run
+ * inside a transaction that ends with touchProject(); every read uses the session, so a scenario's
+ * earlier inserts count toward the slot limit and the duplicate check. `slotRoleId` is attached to
+ * every failure so a scenario commit can name the slot that failed.
+ */
+export async function insertProposal(
+  ctx: ServiceContext,
+  project: ProjectDoc,
+  input: ProposalInput,
+  session: DbSession,
+): Promise<AssignmentDoc> {
+  const { repo, actor, today, now } = ctx;
+  const slot = project.teamRoles.find((r) => r.roleId === input.slotRoleId);
+  if (!slot) invalid('slotRoleId', 'is not a role slot of this project');
+  const slotRoleId = slot!.roleId;
+  const roleIds = unique([slotRoleId, ...input.roleIds]);
+  await repo.assertOwned('teamRoles', roleIds, { session });
+
+  const user = await repo.users.findOne({ _id: input.userId }, { session });
+  if (!user) fail('NOT_FOUND', { resource: 'user', id: input.userId, slotRoleId });
+
+  const window = evaluationWindow(project, today);
+  if (isEmptyInterval(window)) invalid('projectId', 'project has already ended');
+  if (!containsDay(window, input.from)) {
+    invalid('from', `must be inside the project window [${window.from}, ${window.to ?? 'open-ended'})`);
+  }
+
+  if (!(await approverOf(repo, user, session))) fail('NO_APPROVER', { userId: user._id, slotRoleId });
+
+  const existing = await repo.assignments.findOne(
+    { userId: user._id, projectId: project._id, status: { $in: [...NON_TERMINAL_STATUSES] } },
+    { session },
+  );
+  if (existing) {
+    fail('DUPLICATE_ASSIGNMENT', { userId: user._id, projectId: project._id, assignmentId: existing._id, slotRoleId });
+  }
+
+  const taken = await repo.assignments.countDocuments(
+    { projectId: project._id, slotRoleId, status: { $in: [...NON_TERMINAL_STATUSES] } },
+    { session },
+  );
+  if (taken >= slot!.count) fail('SLOT_FULL', { roleId: slotRoleId, count: slot!.count, slotRoleId });
+
+  return repo.assignments.insertOne(
+    {
+      userId: user._id,
+      projectId: project._id,
+      hoursPerDay: input.hoursPerDay,
+      slotRoleId,
+      roleIds,
+      status: 'proposed',
+      from: input.from,
+      to: project.period === 'fixed' ? project.deadline : null,
+      comments: input.comment,
+      approverId: null,
+      proposedBy: actor.userId,
+      version: 0,
+      createdAt: now,
+    },
+    { session },
+  );
+}
 
 /**
  * (none) -> proposed. Runs in a transaction that ends with touchProject(), so two concurrent
@@ -48,60 +121,13 @@ const invalid = (path: string, message: string): never => fail('VALIDATION', { i
  * Proposals do not consume capacity; the approve transaction enforces invariant 1.
  */
 export async function propose(ctx: ServiceContext, input: z.output<typeof ProposeRequest>): Promise<AssignmentView> {
-  const { repo, actor, today, now } = ctx;
+  const { repo, actor } = ctx;
   return repo.withTransaction(async (session) => {
     const project = await loadProject(repo, input.projectId, session);
     if (!can(actor, 'project.staff', { orgId: project.orgId, pmId: project.pmId })) {
       fail('FORBIDDEN', { action: 'propose people for this project' });
     }
-    const slot = project.teamRoles.find((r) => r.roleId === input.slotRoleId);
-    if (!slot) invalid('slotRoleId', 'is not a role slot of this project');
-    const roleIds = unique([input.slotRoleId, ...input.roleIds]);
-    await repo.assertOwned('teamRoles', roleIds, { session });
-
-    const user = await repo.users.findOne({ _id: input.userId }, { session });
-    if (!user) fail('NOT_FOUND', { resource: 'user', id: input.userId });
-
-    const window = evaluationWindow(project, today);
-    if (isEmptyInterval(window)) invalid('projectId', 'project has already ended');
-    if (!containsDay(window, input.from)) {
-      invalid('from', `must be inside the project window [${window.from}, ${window.to ?? 'open-ended'})`);
-    }
-
-    if (!(await approverOf(repo, user, session))) fail('NO_APPROVER', { userId: user._id });
-
-    const existing = await repo.assignments.findOne(
-      { userId: user._id, projectId: project._id, status: { $in: [...NON_TERMINAL_STATUSES] } },
-      { session },
-    );
-    if (existing) {
-      fail('DUPLICATE_ASSIGNMENT', { userId: user._id, projectId: project._id, assignmentId: existing._id });
-    }
-
-    const taken = await repo.assignments.countDocuments(
-      { projectId: project._id, slotRoleId: slot!.roleId, status: { $in: [...NON_TERMINAL_STATUSES] } },
-      { session },
-    );
-    if (taken >= slot!.count) fail('SLOT_FULL', { roleId: slot!.roleId, count: slot!.count });
-
-    const doc = await repo.assignments.insertOne(
-      {
-        userId: user._id,
-        projectId: project._id,
-        hoursPerDay: input.hoursPerDay,
-        slotRoleId: slot!.roleId,
-        roleIds,
-        status: 'proposed',
-        from: input.from,
-        to: project.period === 'fixed' ? project.deadline : null,
-        comments: input.comment,
-        approverId: null,
-        proposedBy: actor.userId,
-        version: 0,
-        createdAt: now,
-      },
-      { session },
-    );
+    const doc = await insertProposal(ctx, project, input, session);
     await touchProject(repo, project._id, session);
     return toAssignmentView(doc);
   });

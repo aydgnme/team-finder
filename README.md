@@ -4,7 +4,9 @@
 
 **A team-first staffing canvas.** Start from the shape of a project team, drag ranked candidates into role slots, and see capacity, skill coverage and conflicts update before you commit. Every ranking explains itself, and approvals stay correct when two managers act at the same moment.
 
-> **Status: early development.** The staffing canvas (M1) works end to end locally (`pnpm dev:local`); deployment, the live demo link and the walkthrough GIF come next. See the [roadmap](#roadmap).
+> **Status: early development.** The staffing canvas (M1) and staffing decisions (M1.5) work end to end locally (`pnpm dev:local`); deployment, the live demo link and the walkthrough GIF come next. See the [roadmap](#roadmap).
+
+**One decision, in numbers:** in the sample company, starting Atlas two weeks later lets the strongest backend developer roll off their current project first. The verdict line says so: *start +2 wk → coverage 83% → 100%, +0 overbooked days* (at the original start the same team would add 14 overbooked days).
 
 Inspired by the "Team Finder" brief from the ASSIST Tech Challenge 2024, rebuilt as an independent project.
 
@@ -15,6 +17,7 @@ Most resource-planning tools start from a people-by-weeks grid and treat skills 
 - **No double booking under concurrency.** Two managers approving different proposals for the same person at the same time must not push them past 8 hours a day. Approvals run in MongoDB transactions that also bump a per-user version, so competing writes conflict and the loser is re-checked and rejected with an exact reason.
 - **One capacity model, client and server.** A pure `CapacityTimeline` in `packages/domain` drives ranking, the drag preview in the browser, and the server-side invariant, so the UI and the API cannot disagree.
 - **Explainable, deterministic matching.** Candidates are scored on skill fit, past-project similarity and availability, with each term shown in the UI. An LLM can draft a team, but the deterministic engine validates every placement before anything is proposed.
+- **Decisions you can compare and share.** Fork the current team, drag the start date and watch availability and the verdict update live; the same pure `compareScenarios()` runs in the browser and on the server. Committing sends every proposal (and moves the project, if the start changed) in one all-or-nothing transaction; a share link stores a server-rebuilt, read-only snapshot.
 - **Tenant isolation by construction.** Routes never touch the raw database; a scoped repository injects the organization into every query, and a lint rule enforces it.
 
 The full design, including the review history behind these decisions, is in [docs/design.md](docs/design.md).
@@ -62,6 +65,7 @@ To run against your own database instead, copy `apps/api/.env.example` to `apps/
 1. Press **Add to slot** on Mira (or drag her card) into the open Backend slot and press Enter: capacity and coverage update before you commit.
 2. Follow the hint to switch to **Dana (Engineering Manager)** and approve Mira: the slot turns active.
 3. Approve Kai: the server re-checks capacity inside the transaction and refuses with the exact date and the most hours that would fit.
+4. **Start over** (bottom right), then follow the first hint: drag the start date two weeks later. Tom moves from "Later" to available as you drag. Add him to the draft: the verdict reads *+0 overbooked days*; drag back to the original start and it reads *+14*. **Share** gives a read-only link; **Move start and send 1 proposal** commits it all in one transaction.
 
 ## Scripts
 
@@ -73,6 +77,18 @@ To run against your own database instead, copy `apps/api/.env.example` to `apps/
 | `pnpm e2e` | Playwright tests in Chromium and WebKit against `pnpm dev:local` (`pnpm exec playwright install` once) |
 | `pnpm lint` / `pnpm format:check` / `pnpm typecheck` | Static checks, also enforced in CI |
 | `pnpm build` | Production build of the web app |
+
+### Upgrading
+
+Indexes are the schema: the API creates the declared list in `apps/api/src/db/indexes.ts` on every boot and never drops one. One of them is unique: at most one open (proposed, active or deallocation-proposed) assignment per person and project. On a database that already holds data, find violations before deploying, or the API keeps retrying the index build and stays in `db: down`:
+
+```js
+db.assignments.aggregate([
+  { $match: { status: { $in: ['proposed', 'active', 'deallocationProposed'] } } },
+  { $group: { _id: { orgId: '$orgId', projectId: '$projectId', userId: '$userId' }, n: { $sum: 1 } } },
+  { $match: { n: { $gt: 1 } } },
+]);
+```
 
 ## How the matching works
 
@@ -92,18 +108,20 @@ Everything is evaluated over the project window `[max(today, start), deadline)` 
 | `POST /api/demo/sessions/switch` | Switch persona inside the demo org (new session id) |
 | `GET /api/session` | Current persona, org and the personas offered by the switcher |
 | `GET /api/projects/:id` | Project, role slots, current team with capacity checks |
-| `GET /api/projects/:id/candidates` | Ranked candidates with score terms, reasons and capacity timelines |
+| `GET /api/projects/:id/candidates?start=` | Ranked candidates with score terms, reasons and capacity timelines; `start` ranks as if the project started later (scrubber, up to 6 weeks) |
+| `POST /api/projects/:id/scenarios/commit` | Commit a draft: move the start (with its team) and create every proposal in one transaction, all-or-nothing |
+| `POST /api/snapshots` · `GET /api/snapshots/:id` | Share a draft as a server-rebuilt, read-only snapshot (demo: public for 30 days) |
 | `POST /api/assignments` | Propose a person for a role slot |
 | `POST /api/assignments/:id/approve` · `/reject` | Decide on a proposal (department manager) |
 | `GET /api/approvals` | Proposals waiting for the caller's department |
 
-Every error uses one envelope, `{ code, message, details, hint }`, for example `409 CAPACITY_EXCEEDED` with `details: { date, used, requested, maxHours }`. Mutations must be `application/json` (anything else is `415`, a CSRF guard).
+Every error uses one envelope, `{ code, message, details, hint }`, for example `409 CAPACITY_EXCEEDED` with `details: { date, used, requested, maxHours }`. Scenario commits add `details.slotRoleId`, so the canvas marks the slot that failed. Mutations must be `application/json` (anything else is `415`, a CSRF guard).
 
 ## Roadmap
 
 - [x] **M0** Monorepo, CI, deployment configuration, test harness with transactions
 - [ ] **M1** Staffing canvas: ranking engine, drag and drop, proposals, atomic approvals, demo sandbox (built and tested locally; deploy and GIF pending)
-- [ ] **M1.5** Staffing decisions: scenario compare, start-date scrubber, shareable plans
+- [ ] **M1.5** Staffing decisions: draft vs current team, start-date scrubber, verdict line, atomic commit, share snapshots (built and tested locally; deploy and GIF pending)
 - [ ] **M2** Authentication, roles and organization onboarding
 - [ ] **M2.5** AI-drafted teams validated by the engine, live concurrency demo
 - [ ] **M3–M5** Departments, skills, project lifecycle, endorsements, notifications, statistics

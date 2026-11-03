@@ -21,6 +21,8 @@ The staffing canvas is the one hero surface; everything else uses the same token
 | `--accent` | `#0f766e` (teal 700, 5.5:1 on white) | The one accent: primary buttons, active slots, coverage, focus ring |
 | `--pending` | `#b45309` (amber 700) | Pending proposals, partial availability, "no approver" |
 | `--conflict` | `#b91c1c` (red 700) | Overbooking, failed approvals |
+| `--draft` / `--draft-soft` | `#4338ca` (indigo 700, 7.9:1) / `#e0e7ff` | Draft (hypothetical) members and the active fork tab; never used for real state |
+| `--scrub-track` / `--scrub-thumb` | `--border` / `--accent` | Start-date scrubber |
 | `--radius` | 6px | Slots, cards, popovers, buttons |
 | Motion | 120 / 180 / 240 ms | Drop settle / snap-back on 409 / pending → active fill |
 
@@ -39,6 +41,8 @@ The staffing canvas is the one hero surface; everything else uses the same token
 | Conflict | `--conflict` | `--conflict-soft` | ⚠ name, "Conflict: exceeds 8 h on <date> (N h booked)" |
 | Active | accent | white | ✓ name, hours, "Active" (240 ms fill on arrival) |
 | Error (409 on propose) | snap-back 180 ms | | inline alert with the DomainError message + hint |
+| Draft | dashed `--draft` | `--draft-soft` | + name, hours, "Draft: fits", Remove |
+| Draft, overbooked | dashed `--conflict` | `--conflict-soft` | ⚠ name, "Draft: overbooked from <date> (N h booked)", Remove |
 
 **Candidate card** — the only card. Name, stacked score mini-bar, title, 8-segment capacity bar, availability line, up to four why-chips, "Add to slot". Rolling-off people ("ghosts") use a dashed border on `--surface-muted` and sit under a **Later** divider; fully booked people (when included) under **Fully booked**.
 
@@ -49,6 +53,12 @@ The staffing canvas is the one hero surface; everything else uses the same token
 **Coverage meter** — solid accent for skills covered by active members, striped accent for skills covered only by pending proposals (or the card being dragged); "Missing: AWS" names gaps; "Fully covered" at 100%.
 
 **Drop popover** — prefilled (hours = most that fit, start = window start or `availableFrom`), Enter confirms, Esc cancels and returns focus to the card's "Add to slot", focus trapped, "More options" (extra roles, comment) collapsed.
+
+**Verdict line** — replaces the goal line while a draft differs from the current team: one sentence, numbers only, never KPI cards: "Draft vs current: start +2 wk → coverage 83% → 100%, +0 overbooked days, 1 slot open". Overbooking is reported as a change against the current team (the seed keeps a known conflict in it). Announced to screen readers when it settles, without a toast (it is already the headline).
+
+**Control row** — one row under the goal line: fork ("Fork to compare", then Current / Draft tabs), the start scrubber, and the draft's actions (Discard draft, Share, primary "Move start and send N proposals"). The share link appears below it as a read-only, select-on-focus input.
+
+**Scrubber** — native range input, `--scrub-thumb` thumb; label "Start Tue Nov 24" in Plex Mono; arrows = 1 day, PageUp/PageDown = 1 week, Home/End = range ends; `aria-valuetext` "Start Tue Nov 24, 2 wk later"; "+6 wk max" at the end. Only before the project starts. While it moves, availability chips update in place and the list dims ("re-ranking…"); 300 ms after it stops the ranked order is refetched and reorders with a 240 ms FLIP (off under reduced motion). < 768px: the control row sticks to the top, scrubber full width with a 44px target.
 
 **Dock** — persona switcher ("Viewing as"), Canvas / Approvals (with pending count for managers), org name. Coach-marks (max two, dismissible, remembered in localStorage) appear above it.
 
@@ -61,6 +71,9 @@ The staffing canvas is the one hero surface; everything else uses the same token
 | Candidates | 6 skeleton rows | names the filter that excluded the most people + one-click relax | inline error + Retry, slots stay usable | ranked list |
 | Approvals | 3 skeleton rows | "Nothing waiting. Proposals for your department show up here." | per-row reason (CAPACITY_EXCEEDED with date and max hours) | row leaves, banner + link back to the canvas |
 | Session expired | — | — | modal "Your demo session ended" + Start a new demo | — |
+| Scenario commit | button "Sending…" | button disabled until the draft changes something | nothing is sent; the failing slot shows the reason; toast "Nothing was sent: …" | "Atlas now starts Nov 24. 1 proposal sent."; the draft becomes the new current team |
+| Share | button "Sharing…" | — | toast with the error | "Link copied." (or "copy the link below" when the clipboard is blocked) |
+| Snapshot page | blank | — | "This snapshot has expired" + Try the live demo | header "Snapshot · Nov 3 · read-only", verdict, slots, CTA |
 
 ## Responsive and accessibility
 

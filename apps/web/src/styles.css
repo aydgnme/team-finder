@@ -899,3 +899,153 @@ kbd {
   letter-spacing: 0;
   color: var(--text);
 }
+
+/* ---- staffing decisions (M1.5): verdict line, control row, scrubber, draft slots, snapshot ---- */
+:root {
+  --draft: #4338ca; /* indigo-700, 7.9:1 on white: drafts are hypothetical, not pending */
+  --draft-soft: #e0e7ff;
+  --scrub-track: var(--border);
+  --scrub-thumb: var(--accent);
+}
+.goal-verdict {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.control-row {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  margin-top: 10px;
+}
+.fork {
+  display: flex;
+  gap: 4px;
+}
+.fork-tab {
+  font-size: 13px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+}
+.fork-tab-active {
+  border-color: var(--draft);
+  color: var(--draft);
+  background: var(--draft-soft);
+  font-weight: 600;
+}
+.scrubber {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.scrubber-label {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.scrubber-value {
+  display: inline-block;
+  min-width: 9ch;
+  font-weight: 600;
+}
+.scrubber input[type='range'] {
+  flex: 1;
+  min-width: 120px;
+  accent-color: var(--scrub-thumb);
+  height: 24px;
+}
+.scrubber-hint,
+.scrubber-stale {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.draft-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.share-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-basis: 100%;
+  font-size: 13px;
+}
+.share-link input {
+  flex: 1;
+  max-width: 560px;
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.coach-inline {
+  position: static;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: none;
+  flex-basis: 100%;
+  padding: 8px 12px;
+}
+.coach-inline p {
+  margin: 0;
+}
+.slot-draft {
+  border-color: var(--draft);
+  border-style: dashed;
+  background: var(--draft-soft);
+}
+.slot-draftConflict {
+  border-color: var(--conflict);
+  border-style: dashed;
+  background: var(--conflict-soft);
+}
+.slot-status-draft {
+  color: var(--draft);
+}
+.slot-status-draftConflict {
+  color: var(--conflict);
+}
+.slot-remove {
+  margin-left: auto;
+  align-self: center;
+}
+.cards-stale {
+  opacity: 0.6;
+  transition: opacity var(--t-snap);
+}
+.snapshot-body .sidebar p {
+  margin: 0 0 12px;
+}
+.snapshot-missing {
+  flex-direction: column;
+  gap: 12px;
+  text-align: center;
+}
+@media (max-width: 767px) {
+  /* The scrubber stays reachable above the bottom sheet, full width, with a 44 px thumb target. */
+  .control-row {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--surface);
+    padding-bottom: 8px;
+  }
+  .scrubber {
+    flex-basis: 100%;
+  }
+  .scrubber input[type='range'] {
+    height: 44px;
+  }
+  .draft-actions {
+    margin-left: 0;
+  }
+}
+.snapshot-cta .btn {
+  margin-bottom: 12px;
+}
