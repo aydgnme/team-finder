@@ -57,6 +57,10 @@ export const DomainError = z.discriminatedUnion('code', [
   envelope('TRANSITION_NOT_ALLOWED', z.object({ from: z.string(), to: z.string() })),
   envelope('NOT_DELETABLE', z.object({ reason: z.string() })),
   envelope('DATE_EDIT_CONFLICT', z.object({ conflicts: z.array(DateConflict).min(1) })),
+  envelope('DEMO_ONLY', none),
+  envelope('RACE_IN_PROGRESS', none),
+  envelope('RACE_TIMEOUT', none),
+  envelope('INVARIANT_BROKEN', none),
   envelope('UNSUPPORTED_MEDIA_TYPE', z.object({ contentType: z.string().optional() })),
   envelope('DB_UNAVAILABLE', none),
   envelope('AI_UNAVAILABLE', z.object({ reason: z.string().optional() })),
@@ -85,6 +89,10 @@ export const HTTP_STATUS: Record<ErrorCode, number> = {
   TRANSITION_NOT_ALLOWED: 409,
   NOT_DELETABLE: 409,
   DATE_EDIT_CONFLICT: 409,
+  DEMO_ONLY: 403,
+  RACE_IN_PROGRESS: 409,
+  RACE_TIMEOUT: 503,
+  INVARIANT_BROKEN: 500,
   UNSUPPORTED_MEDIA_TYPE: 415,
   RATE_LIMITED: 429,
   INTERNAL: 500,
@@ -169,6 +177,22 @@ const TEXTS: { [C in ErrorCode]: Texts<C> } = {
       )
       .join(', ')}.`,
     hint: 'Pick other dates, or change their assignments first.',
+  }),
+  DEMO_ONLY: () => ({
+    message: 'This only runs in demo sandboxes.',
+    hint: 'Open the demo, or run "pnpm demo:race" locally.',
+  }),
+  RACE_IN_PROGRESS: () => ({
+    message: 'A race is already running in this session.',
+    hint: 'Wait for it to finish, then run it again.',
+  }),
+  RACE_TIMEOUT: () => ({
+    message: 'Both approvals did not reach the barrier within 2 s.',
+    hint: 'The server may be busy; retry.',
+  }),
+  INVARIANT_BROKEN: () => ({
+    message: 'Both approvals committed: the person would be overbooked.',
+    hint: 'This should never happen; it was logged. Please file an issue.',
   }),
   UNSUPPORTED_MEDIA_TYPE: () => ({
     message: 'Mutations must be sent as application/json.',

@@ -10,3 +10,4 @@ export * from './scenarios.ts';
 export * from './ai.ts';
 export * from './auth.ts';
 export * from './projects.ts';
+export * from './race.ts';
