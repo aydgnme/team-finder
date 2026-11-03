@@ -4,7 +4,7 @@
 
 **A team-first staffing canvas.** Start from the shape of a project team, drag ranked candidates into role slots, and see capacity, skill coverage and conflicts update before you commit. Every ranking explains itself, and approvals stay correct when two managers act at the same moment.
 
-> **Status: early development.** The monorepo, CI and deployment setup (M0) are in place; the staffing canvas (M1) is next. See the [roadmap](#roadmap). The live demo link and walkthrough GIF will be added here once the demo is deployed.
+> **Status: early development.** The staffing canvas (M1) works end to end locally (`pnpm dev:local`); deployment, the live demo link and the walkthrough GIF come next. See the [roadmap](#roadmap).
 
 Inspired by the "Team Finder" brief from the ASSIST Tech Challenge 2024, rebuilt as an independent project.
 
@@ -50,25 +50,59 @@ Prerequisites: **Node.js 26** and **pnpm 12** (Node 26 no longer bundles Corepac
 git clone https://github.com/aydgnme/team-finder.git
 cd team-finder
 pnpm install
-pnpm dev
+pnpm dev:local
 ```
 
-The web app runs on http://localhost:5173 and proxies `/api` to the API on port 3000. Without `MONGODB_URI` the API starts without a database and only `/api/health` is available. To use a database, copy `apps/api/.env.example` to `apps/api/.env` and set a replica-set connection string (transactions need a replica set). A one-command local setup with an in-memory database and seed data (`pnpm dev:local`) is planned for M1.
+`pnpm dev:local` starts an in-memory MongoDB replica set (transactions need one), the API against it and the web app. Open http://localhost:5173: every visit clones the "Atlas" sample company into its own sandbox and lands on the canvas as the project manager. No accounts or environment variables are needed; the first run downloads a MongoDB binary.
+
+To run against your own database instead, copy `apps/api/.env.example` to `apps/api/.env`, set a replica-set `MONGODB_URI` and run `pnpm dev`. Without `MONGODB_URI` the API starts without a database and every route except `/api/health` answers `503 DB_UNAVAILABLE`.
+
+### Try this
+
+1. Press **Add to slot** on Mira (or drag her card) into the open Backend slot and press Enter: capacity and coverage update before you commit.
+2. Follow the hint to switch to **Dana (Engineering Manager)** and approve Mira: the slot turns active.
+3. Approve Kai: the server re-checks capacity inside the transaction and refuses with the exact date and the most hours that would fit.
 
 ## Scripts
 
 | Command | What it does |
 | --- | --- |
-| `pnpm dev` | Start API and web app in watch mode |
+| `pnpm dev:local` | In-memory replica set + API + web app; also used by the e2e suite |
+| `pnpm dev` | Start API and web app in watch mode against `MONGODB_URI` |
 | `pnpm test` | Unit and API tests (first run downloads a MongoDB binary; `pnpm test:prepare` fetches it ahead of time) |
-| `pnpm e2e` | Playwright tests in Chromium and WebKit (`pnpm exec playwright install` once) |
+| `pnpm e2e` | Playwright tests in Chromium and WebKit against `pnpm dev:local` (`pnpm exec playwright install` once) |
 | `pnpm lint` / `pnpm format:check` / `pnpm typecheck` | Static checks, also enforced in CI |
 | `pnpm build` | Production build of the web app |
+
+## How the matching works
+
+Everything is evaluated over the project window `[max(today, start), deadline)` (open-ended for ongoing projects), in UTC days, with half-open intervals.
+
+- **Capacity:** `buildTimeline()` turns a person's assignments into sorted segments of `{used, pending}` hours per day. Active and deallocation-proposed assignments count as used; proposals count as pending. `withProposal()` answers "does N h/day from this date still fit under 8?" and returns the first day that would break. The ranking, the drag preview in the browser and the approval transaction all call it.
+- **Availability:** fully available (8 h free every day), partially available, rolling off (fully free from a date within N weeks; assignments on ongoing projects never roll off), or unavailable.
+- **Score (0–100):** `60 × skill fit + 25 × past-project similarity + 15 × availability`, weights in one constant (`SCORE_WEIGHTS`). Skill fit averages, over the project's required skills, 80% level and 20% experience. Similarity is the best Jaccard overlap of skills and roles with a past project. Ties break by name.
+- **Explanations:** the engine returns structured reasons (`rollsOff`, `pastProject`, `partial`, `noApprover`…); the UI turns them into chips.
+
+## API
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/health` | Liveness, database state, cookie round-trip probe |
+| `POST /api/demo/sessions` | Clone the Atlas seed into a sandbox org and sign in as its project manager |
+| `POST /api/demo/sessions/switch` | Switch persona inside the demo org (new session id) |
+| `GET /api/session` | Current persona, org and the personas offered by the switcher |
+| `GET /api/projects/:id` | Project, role slots, current team with capacity checks |
+| `GET /api/projects/:id/candidates` | Ranked candidates with score terms, reasons and capacity timelines |
+| `POST /api/assignments` | Propose a person for a role slot |
+| `POST /api/assignments/:id/approve` · `/reject` | Decide on a proposal (department manager) |
+| `GET /api/approvals` | Proposals waiting for the caller's department |
+
+Every error uses one envelope, `{ code, message, details, hint }`, for example `409 CAPACITY_EXCEEDED` with `details: { date, used, requested, maxHours }`. Mutations must be `application/json` (anything else is `415`, a CSRF guard).
 
 ## Roadmap
 
 - [x] **M0** Monorepo, CI, deployment configuration, test harness with transactions
-- [ ] **M1** Staffing canvas: ranking engine, drag and drop, proposals, atomic approvals, demo sandbox
+- [ ] **M1** Staffing canvas: ranking engine, drag and drop, proposals, atomic approvals, demo sandbox (built and tested locally; deploy and GIF pending)
 - [ ] **M1.5** Staffing decisions: scenario compare, start-date scrubber, shareable plans
 - [ ] **M2** Authentication, roles and organization onboarding
 - [ ] **M2.5** AI-drafted teams validated by the engine, live concurrency demo

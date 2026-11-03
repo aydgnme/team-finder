@@ -11,17 +11,11 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
-  webServer: [
-    {
-      command: 'pnpm --filter @team-finder/api start',
-      url: 'http://localhost:3000/api/health',
-      reuseExistingServer: !process.env.CI,
-      env: { PORT: '3000', MONGODB_URI: '' },
-    },
-    {
-      command: 'pnpm --filter @team-finder/web dev',
-      url: 'http://localhost:5173',
-      reuseExistingServer: !process.env.CI,
-    },
-  ],
+  // Same command a reviewer runs: in-memory replica set + API + web (docs/design.md, DX #1).
+  webServer: {
+    command: 'pnpm dev:local --no-watch',
+    url: 'http://localhost:5173/api/health',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
 });
