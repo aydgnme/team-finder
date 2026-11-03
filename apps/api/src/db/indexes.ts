@@ -12,6 +12,11 @@ export interface DeclaredIndex {
   name: string;
   key: IndexSpecification;
   options?: Omit<CreateIndexesOptions, 'name'>;
+  /**
+   * Why this index does not lead with orgId. Only for lookups that happen before the org is known
+   * (login by email, invite links); never applied to Mongo.
+   */
+  global?: string;
 }
 
 const ttl = (collection: string): DeclaredIndex => ({
@@ -26,6 +31,29 @@ export const INDEXES: DeclaredIndex[] = [
   ttl('sessions'),
   ...TENANT_COLLECTIONS.map(ttl),
   { collection: 'users', name: 'org_department', key: { orgId: 1, departmentId: 1 } },
+  {
+    collection: 'users',
+    name: 'login_email_unique',
+    key: { email: 1 },
+    global: 'login finds the account by email before the org is known',
+    // Login looks people up by email before the org is known: one account per address. Demo users
+    // carry no password and are not constrained (every sandbox reuses the seed's addresses).
+    options: { unique: true, partialFilterExpression: { passwordHash: { $type: 'string' } } },
+  },
+  {
+    collection: 'orgs',
+    name: 'invite_token_unique',
+    key: { inviteToken: 1 },
+    global: 'an invite link identifies its org',
+    options: { unique: true, partialFilterExpression: { inviteToken: { $type: 'string' } } },
+  },
+  {
+    collection: 'teamRoles',
+    name: 'org_name_unique_ci',
+    key: { orgId: 1, name: 1 },
+    // Role-02: names are unique per org regardless of case ("QA" and "qa" are the same role).
+    options: { unique: true, collation: { locale: 'en', strength: 2 } },
+  },
   {
     collection: 'departments',
     name: 'org_manager_unique',

@@ -25,6 +25,8 @@ export function testApp(database: Database | undefined, options: Partial<AppOpti
       demoPerClient: { max: 1000, windowMs: 60_000 },
       demoGlobal: { max: 1000, windowMs: 60_000 },
       mutationsPerSession: { max: 1000, windowMs: 60_000 },
+      authPerClient: { max: 1000, windowMs: 60_000 },
+      loginPerEmail: { max: 1000, windowMs: 60_000 },
     },
     ...options,
   });
@@ -63,7 +65,7 @@ export async function switchTo(app: FastifyInstance, v: Visitor, userId: string)
 export function call(
   app: FastifyInstance,
   v: Pick<Visitor, 'cookie'> | null,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   url: string,
   payload?: unknown,
 ) {
@@ -71,6 +73,7 @@ export function call(
     method,
     url,
     ...(v ? { cookies: { [SESSION_COOKIE]: v.cookie } } : {}),
-    ...(method === 'POST' ? { payload: (payload ?? {}) as object } : {}),
+    // Every mutation is JSON (the CSRF rule), even when there is nothing to send.
+    ...(method === 'GET' ? {} : { payload: (payload ?? {}) as object }),
   });
 }

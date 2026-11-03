@@ -59,3 +59,30 @@ export function setSessionCookie(reply: FastifyReply, deps: RequestDeps, id: str
     expires: expiresAt,
   });
 }
+
+export const REAL_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Signs the browser in as `userId`: always a fresh session id (session fixation), and the session
+ * the browser held before is deleted. Used by sign-up, join and login; the demo routes do the same.
+ */
+export async function issueSession(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  deps: RequestDeps,
+  store: SessionStore,
+  input: { orgId: string; userId: string; isDemo: boolean; expiresAt: Date },
+) {
+  const now = deps.now();
+  const previous = request.cookies[SESSION_COOKIE];
+  if (previous) await store.delete(previous);
+  const session = await store.create(input, now);
+  setSessionCookie(reply, deps, session._id, session.expiresAt);
+  const actor = await store.resolve(session._id, now);
+  if (!actor) throw new Error('new session did not resolve');
+  return actor;
+}
+
+export function clearSessionCookie(reply: FastifyReply, deps: RequestDeps) {
+  reply.clearCookie(SESSION_COOKIE, { path: '/api', httpOnly: true, sameSite: 'lax', secure: deps.secureCookies });
+}

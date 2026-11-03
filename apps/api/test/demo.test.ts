@@ -15,9 +15,9 @@ describe('POST /api/demo/sessions', () => {
     expect(v.info.user).toMatchObject({ name: 'Pat Reyes', roles: ['employee', 'projectManager'] });
     expect(v.info.org).toMatchObject({ name: 'Northwind Labs', isDemo: true });
     expect(v.info.landingProjectId).toEqual(expect.any(String));
-    expect(v.info.personas.map((p) => p.name)).toEqual(['Pat Reyes', 'Dana Okafor', 'Ana Silva']);
+    expect(v.info.personas.map((p) => p.name)).toEqual(['Pat Reyes', 'Dana Okafor', 'Ana Silva', 'Olivia Grant']);
     const users = await database.db.collection('users').countDocuments({ orgId: v.info.org.id });
-    expect(users).toBe(10); // 8 employees + PM + dept manager
+    expect(users).toBe(11); // 8 employees + PM + dept manager + org admin
   });
 
   it('stamps expiresAt on every document of the sandbox (TTL cleanup)', async () => {
