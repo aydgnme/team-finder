@@ -74,6 +74,8 @@ The staffing canvas is the one hero surface; everything else uses the same token
 
 **Organization tabs** — Members · Departments · Skills under the org name; the current tab is underlined in accent. Departments: one section per department with Rename/Delete (admins), a manager select (admins), members with Remove, and "Add someone…". Skills: My skills (level and experience selects, Remove, add row) above the catalog grouped by category ("built in" or "by <author>", Delete for authors while unused).
 
+**How it works (race page)** — `#/how-it-works`, linked as "How it works" from the demo dock. A short explanation, one primary button ("Run the race", then "Run it again"), then the result: a heading in Plex Mono, "✓ A committed · ✗ B refused (CAPACITY_EXCEEDED) · replays 1"; two swimlanes (labelled with the lane and project) on a shared millisecond axis, each a bar from start to outcome with a mark per event, the committed lane in accent and the refused one in `--conflict`; the barrier is a dashed vertical rule across both lanes. Below it the same events as an ordered text list, which is what screen readers get (the figure is `aria-hidden`). The live region announces "A committed; B was replayed and refused with CAPACITY_EXCEEDED." Errors are inline; a rate limit says "Try again in N s."
+
 **Dock** — persona switcher ("Viewing as"), Canvas / Approvals (with pending count for managers), org name. Coach-marks (max two, dismissible, remembered in localStorage) appear above it.
 
 ## States
