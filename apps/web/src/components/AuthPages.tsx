@@ -151,7 +151,7 @@ export function JoinPage({ token }: { token: string }) {
   const invite = useQuery({ queryKey: ['invite', token], queryFn: () => api.invite(token), retry: false });
   const [f, setF] = useState({ name: '', email: '', password: '' });
   const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }));
-  const m = useMutation({ mutationFn: () => api.join(token, f), onSuccess: signedIn });
+  const m = useMutation({ mutationFn: () => api.join({ token, ...f }), onSuccess: signedIn });
 
   if (invite.isPending) return <main className="fullscreen" aria-busy="true" />;
   if (invite.isError) {

@@ -42,7 +42,7 @@ async function invite(admin: Visitor) {
 
 async function join(token: string, name = 'Emma Employee') {
   const email = uniqueEmail('emma');
-  const res = await call(app, null, 'POST', `/api/invites/${token}/join`, { name, email, password: PASSWORD });
+  const res = await call(app, null, 'POST', '/api/invites/join', { token, name, email, password: PASSWORD });
   expect(res.statusCode, res.body).toBe(201);
   return { member: visitor(res), email };
 }
@@ -159,7 +159,7 @@ describe('Auth-02/03 invites', () => {
   it('lets an employee join through the invite link', async () => {
     const { admin } = await signUp({ orgName: 'Invite Co' });
     const token = await invite(admin);
-    expect((await call(app, null, 'GET', `/api/invites/${token}`)).json()).toEqual({ orgName: 'Invite Co' });
+    expect((await call(app, null, 'POST', '/api/invites/lookup', { token })).json()).toEqual({ orgName: 'Invite Co' });
     const { member } = await join(token);
     expect(member.info).toMatchObject({ user: { roles: ['employee'] }, org: { id: admin.info.org.id } });
     const members = MembersResponse.parse((await call(app, member, 'GET', '/api/org/members')).json()).members;
@@ -174,10 +174,11 @@ describe('Auth-02/03 invites', () => {
     const res = await call(app, admin, 'POST', '/api/org/invite', {});
     const fresh = OrgSettings.parse(res.json()).inviteToken!;
     expect(fresh).not.toBe(old);
-    expect((await call(app, null, 'GET', `/api/invites/${old}`)).statusCode).toBe(404);
+    expect((await call(app, null, 'POST', '/api/invites/lookup', { token: old })).statusCode).toBe(404);
     expect(
       (
-        await call(app, null, 'POST', `/api/invites/${old}/join`, {
+        await call(app, null, 'POST', '/api/invites/join', {
+          token: old,
           name: 'X',
           email: uniqueEmail(),
           password: PASSWORD,
@@ -185,6 +186,13 @@ describe('Auth-02/03 invites', () => {
       ).statusCode,
     ).toBe(404);
     await join(fresh);
+  });
+
+  it('never takes the invite secret in a URL (request and proxy logs record URLs)', async () => {
+    const { admin } = await signUp();
+    const token = await invite(admin);
+    expect((await call(app, null, 'GET', `/api/invites/${token}`)).statusCode).toBe(404);
+    expect((await call(app, null, 'POST', `/api/invites/${token}/join`, {})).statusCode).toBe(404);
   });
 
   it('takes no invites into demo sandboxes', async () => {
@@ -199,7 +207,8 @@ describe('Auth-02/03 invites', () => {
 
   it('refuses an email that already has an account', async () => {
     const { admin, email } = await signUp();
-    const res = await call(app, null, 'POST', `/api/invites/${await invite(admin)}/join`, {
+    const res = await call(app, null, 'POST', '/api/invites/join', {
+      token: await invite(admin),
       name: 'Dup',
       email,
       password: PASSWORD,

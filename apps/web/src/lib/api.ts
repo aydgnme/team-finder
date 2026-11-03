@@ -124,9 +124,8 @@ export const api = {
   signUp: (body: SignUpRequest) => request(SessionInfo, '/api/auth/signup', { method: 'POST', body }),
   login: (body: LoginRequest) => request(SessionInfo, '/api/auth/login', { method: 'POST', body }),
   logout: () => request(z.object({ ok: z.boolean() }), '/api/auth/logout', { method: 'POST' }),
-  invite: (token: string) => request(InviteInfo, `/api/invites/${encodeURIComponent(token)}`),
-  join: (token: string, body: JoinRequest) =>
-    request(SessionInfo, `/api/invites/${encodeURIComponent(token)}/join`, { method: 'POST', body }),
+  invite: (token: string) => request(InviteInfo, '/api/invites/lookup', { method: 'POST', body: { token } }),
+  join: (body: JoinRequest) => request(SessionInfo, '/api/invites/join', { method: 'POST', body }),
   org: () => request(OrgSettings, '/api/org'),
   regenerateInvite: () => request(OrgSettings, '/api/org/invite', { method: 'POST' }),
   members: () => request(MembersResponse, '/api/org/members'),

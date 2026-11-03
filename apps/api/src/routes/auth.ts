@@ -1,4 +1,11 @@
-import { fail, JoinRequest, LoginRequest, SignUpRequest, type InviteInfo } from '@team-finder/domain';
+import {
+  fail,
+  InviteLookupRequest,
+  JoinRequest,
+  LoginRequest,
+  SignUpRequest,
+  type InviteInfo,
+} from '@team-finder/domain';
 import type { FastifyInstance } from 'fastify';
 import { burnVerify, hashPassword, verifyPassword } from '../auth/passwords.ts';
 import { authStore, duplicateKeyOn } from '../db/auth.ts';
@@ -14,8 +21,6 @@ import {
 import type { Limiter } from '../http/rate-limit.ts';
 import { parse } from '../http/validate.ts';
 import { sessionInfo } from '../services/demo.ts';
-
-type TokenParams = { Params: { token: string } };
 
 /**
  * Auth-01..03. Every route here works without a session. Login failures are one generic error;
@@ -75,20 +80,22 @@ export function authRoutes(app: FastifyInstance, deps: RequestDeps, limits: { pe
     return { ok: true };
   });
 
-  app.get<TokenParams>('/api/invites/:token', async (request): Promise<InviteInfo> => {
+  // POST, with the token in the body: the secret never appears in a URL or a log line.
+  app.post('/api/invites/lookup', async (request): Promise<InviteInfo> => {
     hit(request.ip);
     const { database } = requireDatabase(deps);
-    const org = await authStore(database).findOrgByInvite(request.params.token);
+    const { token } = parse(InviteLookupRequest, request.body);
+    const org = await authStore(database).findOrgByInvite(token);
     if (!org) fail('NOT_FOUND', { resource: 'invite' });
     return { orgName: org!.name };
   });
 
-  app.post<TokenParams>('/api/invites/:token/join', async (request, reply) => {
+  app.post('/api/invites/join', async (request, reply) => {
     hit(request.ip);
     const { database, store } = requireDatabase(deps);
     const input = parse(JoinRequest, request.body);
     const auth = authStore(database);
-    const org = await auth.findOrgByInvite(request.params.token);
+    const org = await auth.findOrgByInvite(input.token);
     if (!org) fail('NOT_FOUND', { resource: 'invite' });
     const passwordHash = await hashPassword(input.password);
     const userId = await auth.addMember(org!._id, { ...input, passwordHash }).catch(emailTaken);

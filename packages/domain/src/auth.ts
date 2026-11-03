@@ -38,8 +38,15 @@ export const LoginRequest = z.object({
 });
 export type LoginRequest = z.input<typeof LoginRequest>;
 
+/**
+ * Invite tokens are secrets: they travel in JSON bodies, never in API URL paths, so neither our
+ * request logs nor the SPA host's proxy logs ever record them.
+ */
+const InviteToken = z.string().min(1).max(100);
+export const InviteLookupRequest = z.object({ token: InviteToken });
+
 /** Auth-03: an employee joins through the invite URL. */
-export const JoinRequest = z.object({ name: PersonName, email: Email, password: Password });
+export const JoinRequest = z.object({ token: InviteToken, name: PersonName, email: Email, password: Password });
 export type JoinRequest = z.input<typeof JoinRequest>;
 
 export const InviteInfo = z.object({ orgName: z.string() });

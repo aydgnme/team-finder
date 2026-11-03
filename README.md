@@ -118,7 +118,7 @@ Everything is evaluated over the project window `[max(today, start), deadline)` 
 | `GET /api/projects/:id/candidates?start=` | Ranked candidates with score terms, reasons and capacity timelines; `start` ranks as if the project started later (scrubber, up to 6 weeks) |
 | `POST /api/projects/:id/scenarios/commit` | Commit a draft: move the start (with its team) and create every proposal in one transaction, all-or-nothing |
 | `POST /api/auth/signup` · `/login` · `/logout` | Create an organization and its admin; sign in and out (server-side sessions, rotated on every sign-in) |
-| `GET /api/invites/:token` · `POST /api/invites/:token/join` | Invite link: show the org, join it as an employee |
+| `POST /api/invites/lookup` · `POST /api/invites/join` | Invite link: show the org, join it as an employee (the token goes in the JSON body, never in a URL that logs would keep) |
 | `GET /api/org` · `POST /api/org/invite` | Org settings and invite link; replace the link (admins) |
 | `GET /api/org/members` · `PUT /api/org/members/:id/roles` | Members with their access roles; change roles (admins; the last admin stays) |
 | `GET/POST /api/team-roles` · `PATCH/DELETE /api/team-roles/:id` | Team roles, unique per org; delete only when unused (admins) |
