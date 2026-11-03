@@ -7,3 +7,4 @@ export { HealthResponse } from './health.ts';
 export * from './matching.ts';
 export * from './permissions.ts';
 export * from './scenarios.ts';
+export * from './ai.ts';

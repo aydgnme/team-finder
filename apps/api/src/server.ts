@@ -1,3 +1,5 @@
+import { anthropicProvider } from './ai/anthropic.ts';
+import { fakeProvider } from './ai/fake.ts';
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { connectDatabase, type Database } from './db/client.ts';
@@ -11,6 +13,12 @@ const app = buildApp({
   secureCookies: config.production,
   trustProxy: config.trustProxy,
   rateLimits: config.rateLimits,
+  aiProvider:
+    config.ai.provider === 'anthropic'
+      ? anthropicProvider({ apiKey: config.ai.apiKey, model: config.ai.model })
+      : config.ai.provider === 'fake'
+        ? fakeProvider
+        : null,
   logger: true,
 });
 
