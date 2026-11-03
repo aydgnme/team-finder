@@ -7,7 +7,9 @@ import { registerErrorHandling } from './http/errors.ts';
 import { createLimiter, type RateLimit } from './http/rate-limit.ts';
 import type { DraftProvider } from './ai/provider.ts';
 import { aiRoutes } from './routes/ai.ts';
+import { authRoutes } from './routes/auth.ts';
 import { demoRoutes } from './routes/demo.ts';
+import { orgRoutes } from './routes/org.ts';
 import { scenarioRoutes } from './routes/scenarios.ts';
 import { staffingRoutes } from './routes/staffing.ts';
 
@@ -18,6 +20,10 @@ export interface RateLimits {
   demoGlobal: RateLimit;
   /** Mutations per session. */
   mutationsPerSession: RateLimit;
+  /** Sign-up, login, invite lookups and joins per client IP. */
+  authPerClient: RateLimit;
+  /** Login attempts per email address. */
+  loginPerEmail: RateLimit;
   /** AI drafts per session (each one is a paid model call). */
   aiPerSession: RateLimit;
   /** AI drafts across all sessions per day (the spend cap). */
@@ -28,6 +34,8 @@ export const DEFAULT_RATE_LIMITS: RateLimits = {
   demoPerClient: { max: 10, windowMs: 60_000 },
   demoGlobal: { max: 30, windowMs: 60_000 },
   mutationsPerSession: { max: 60, windowMs: 60_000 },
+  authPerClient: { max: 10, windowMs: 60_000 },
+  loginPerEmail: { max: 10, windowMs: 15 * 60_000 },
   aiPerSession: { max: 5, windowMs: 60_000 },
   aiDaily: { max: 300, windowMs: 24 * 60 * 60_000 },
 };
@@ -104,6 +112,11 @@ export function buildApp(options: AppOptions): FastifyInstance {
   });
   staffingRoutes(app, deps, { mutations });
   scenarioRoutes(app, deps, { mutations });
+  authRoutes(app, deps, {
+    perClient: createLimiter(rl.authPerClient),
+    perEmail: createLimiter(rl.loginPerEmail),
+  });
+  orgRoutes(app, deps, { mutations });
   aiRoutes(app, deps, {
     provider: options.aiProvider ?? null,
     perSession: createLimiter(rl.aiPerSession),

@@ -46,6 +46,7 @@ run('api', process.execPath, [...(watch ? ['--watch'] : []), 'src/server.ts'], a
   MONGODB_DB: 'team-finder-local',
   // Local runs (and the e2e suite) create many sandboxes from one IP.
   DEMO_SESSIONS_PER_MINUTE: '1000',
+  AUTH_REQUESTS_PER_MINUTE: '1000',
 });
 
 // Start the web app only once the API answers with a connected database.

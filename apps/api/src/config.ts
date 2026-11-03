@@ -26,6 +26,7 @@ export function parseTrustProxy(value: string | undefined): boolean | number | s
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const demoPerMinute = Number(env.DEMO_SESSIONS_PER_MINUTE);
   const aiDailyCap = Number(env.LLM_DAILY_CAP);
+  const authPerMinute = Number(env.AUTH_REQUESTS_PER_MINUTE);
   const ai: Config['ai'] =
     env.LLM_PROVIDER === 'fake'
       ? { provider: 'fake' }
@@ -45,6 +46,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
             demoGlobal: { max: demoPerMinute * 3, windowMs: 60_000 },
           }
         : {}),
+      ...(authPerMinute > 0 ? { authPerClient: { max: authPerMinute, windowMs: 60_000 } } : {}),
       ...(aiDailyCap > 0 ? { aiDaily: { max: aiDailyCap, windowMs: 24 * 60 * 60_000 } } : {}),
     },
     ai,

@@ -33,6 +33,13 @@ describe('can()', () => {
     ['demo.switchPersona', emp, { orgId: 'o1', isDemo: true }, true],
     ['demo.switchPersona', actor(['employee'], { isDemo: false }), { orgId: 'o1', isDemo: true }, false],
     ['demo.switchPersona', emp, { orgId: 'o2', isDemo: true }, false],
+    ['org.view', emp, { orgId: 'o1' }, true],
+    ['org.view', admin, { orgId: 'o2' }, false],
+    ['org.manage', admin, { orgId: 'o1' }, true],
+    ['org.manage', admin, { orgId: 'o2' }, false],
+    ['org.manage', pm, { orgId: 'o1' }, false],
+    ['org.manage', dm, { orgId: 'o1' }, false],
+    ['org.manage', emp, { orgId: 'o1' }, false],
   ] as const)('%s for %o on %o -> %s', (action, who, resource, expected) => {
     expect(can(who, action, resource as never)).toBe(expected);
   });

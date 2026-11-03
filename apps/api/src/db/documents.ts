@@ -12,7 +12,12 @@ export interface TenantDoc {
 export interface OrgDoc {
   _id: string;
   name: string;
+  hqAddress?: string;
   isDemo: boolean;
+  /** Auth-02: the invite link's secret; real orgs only. Regenerating it revokes the old link. */
+  inviteToken?: string;
+  /** Bumped by every role change, so two admins demoting each other conflict (see setRoles). */
+  rolesVersion?: number;
   expiresAt?: Date;
   landingProjectId: string | null;
   createdAt: Date;
@@ -24,6 +29,8 @@ export interface UserDoc extends TenantDoc {
   title: string;
   accessRoles: AccessRole[];
   departmentId: string | null;
+  /** argon2id PHC string; absent for demo users, who can never log in. */
+  passwordHash?: string;
   /** Bumped by every transaction that changes this person's capacity (invariant 2). */
   capacityVersion: number;
   /** Order in the demo role switcher; absent for people who are not offered as personas. */

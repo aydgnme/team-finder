@@ -20,9 +20,11 @@ describe('ensureIndexes', () => {
     expect((await database.db.collection('users').indexes()).map((i) => i.name)).toContain('adhoc_email');
   });
 
-  it('leads every non-TTL index with orgId', () => {
-    for (const index of INDEXES.filter((i) => i.options?.expireAfterSeconds === undefined)) {
+  it('leads every non-TTL index with orgId, except named pre-auth lookups', () => {
+    for (const index of INDEXES.filter((i) => i.options?.expireAfterSeconds === undefined && !i.global)) {
       expect(Object.keys(index.key as object)[0], `${index.collection}.${index.name}`).toBe('orgId');
     }
+    // The exceptions are exactly the two lookups that run before anyone is signed in.
+    expect(INDEXES.filter((i) => i.global).map((i) => i.name)).toEqual(['login_email_unique', 'invite_token_unique']);
   });
 });

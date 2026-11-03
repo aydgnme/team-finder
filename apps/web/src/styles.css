@@ -1146,3 +1146,155 @@ kbd {
     padding-right: 4px;
   }
 }
+
+/* ---- auth and organization (M2) ---- */
+.auth-box {
+  width: 100%;
+  max-width: 400px;
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.field input {
+  font: inherit;
+  font-weight: 400;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+.field-hint {
+  font-weight: 400;
+  font-size: 12px;
+}
+.auth-alt {
+  margin-top: 16px;
+  font-size: 14px;
+}
+.dock-auth {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.org-page {
+  max-width: 960px;
+  padding: 20px 24px;
+}
+.org-section {
+  margin-bottom: 28px;
+}
+.org-section h2 {
+  margin-bottom: 8px;
+}
+.org-section > p {
+  margin: 0 0 10px;
+}
+.invite-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.invite-row input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.members {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.members th,
+.members td {
+  text-align: left;
+  vertical-align: top;
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.members thead th {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.member-name {
+  display: block;
+  font-weight: 600;
+}
+.member-email {
+  font-size: 12px;
+  font-weight: 400;
+}
+.role-boxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.team-roles {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+.team-role {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.team-role-name {
+  font-weight: 500;
+}
+.team-role-use {
+  font-size: 12px;
+}
+.team-role-actions {
+  margin-left: auto;
+}
+.team-role-add,
+.team-role-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.team-role-add input,
+.team-role-edit input {
+  font: inherit;
+  font-size: 14px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+.team-role .inline-error,
+.team-role-add .inline-error {
+  flex-basis: 100%;
+}
+@media (max-width: 767px) {
+  .members thead {
+    display: none;
+  }
+  .members tr,
+  .members th,
+  .members td {
+    display: block;
+  }
+  .org-page {
+    padding: 16px;
+  }
+}

@@ -1,10 +1,24 @@
 import { useEffect, useState } from 'react';
 
 export type Route =
-  { name: 'canvas'; projectId: string | null } | { name: 'approvals' } | { name: 'snapshot'; id: string };
+  | { name: 'canvas'; projectId: string | null }
+  | { name: 'approvals' }
+  | { name: 'snapshot'; id: string }
+  | { name: 'signup' }
+  | { name: 'login' }
+  | { name: 'join'; token: string }
+  | { name: 'org' };
+
+/** Screens that work without a session: they must never create a demo sandbox. */
+export const PUBLIC_ROUTES = new Set<Route['name']>(['snapshot', 'signup', 'login', 'join']);
 
 function parse(hash: string): Route {
   if (hash.startsWith('#/approvals')) return { name: 'approvals' };
+  if (hash.startsWith('#/signup')) return { name: 'signup' };
+  if (hash.startsWith('#/login')) return { name: 'login' };
+  if (hash.startsWith('#/org')) return { name: 'org' };
+  const join = /^#\/join\/([^/?]+)/.exec(hash);
+  if (join) return { name: 'join', token: decodeURIComponent(join[1]!) };
   const snap = /^#\/s\/([^/?]+)/.exec(hash);
   if (snap) return { name: 'snapshot', id: decodeURIComponent(snap[1]!) };
   const m = /^#\/projects\/([^/?]+)/.exec(hash);
@@ -26,6 +40,10 @@ export const href = {
   canvas: (projectId: string) => `#/projects/${encodeURIComponent(projectId)}`,
   approvals: () => '#/approvals',
   snapshot: (id: string) => `#/s/${encodeURIComponent(id)}`,
+  signup: () => '#/signup',
+  login: () => '#/login',
+  join: (token: string) => `#/join/${encodeURIComponent(token)}`,
+  org: () => '#/org',
 };
 
 export function navigate(to: string) {

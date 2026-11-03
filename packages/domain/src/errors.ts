@@ -42,6 +42,11 @@ export const DomainError = z.discriminatedUnion('code', [
       slotRoleId: SlotRoleId,
     }),
   ),
+  envelope('INVALID_CREDENTIALS', none),
+  envelope('EMAIL_TAKEN', none),
+  envelope('LAST_ADMIN', none),
+  envelope('NAME_TAKEN', z.object({ name: z.string() })),
+  envelope('IN_USE', z.object({ resource: z.string() })),
   envelope('UNSUPPORTED_MEDIA_TYPE', z.object({ contentType: z.string().optional() })),
   envelope('DB_UNAVAILABLE', none),
   envelope('AI_UNAVAILABLE', z.object({ reason: z.string().optional() })),
@@ -62,6 +67,11 @@ export const HTTP_STATUS: Record<ErrorCode, number> = {
   SLOT_FULL: 409,
   NO_APPROVER: 409,
   CAPACITY_EXCEEDED: 409,
+  INVALID_CREDENTIALS: 401,
+  EMAIL_TAKEN: 409,
+  LAST_ADMIN: 409,
+  NAME_TAKEN: 409,
+  IN_USE: 409,
   UNSUPPORTED_MEDIA_TYPE: 415,
   RATE_LIMITED: 429,
   INTERNAL: 500,
@@ -78,7 +88,7 @@ const TEXTS: { [C in ErrorCode]: Texts<C> } = {
   }),
   UNAUTHENTICATED: () => ({
     message: 'No active session.',
-    hint: 'Start a demo with POST /api/demo/sessions.',
+    hint: 'Sign in, or start a demo with POST /api/demo/sessions.',
   }),
   FORBIDDEN: (d) => ({
     message: d.action ? `You are not allowed to ${d.action}.` : 'You are not allowed to do that.',
@@ -110,6 +120,26 @@ const TEXTS: { [C in ErrorCode]: Texts<C> } = {
       d.maxHours > 0
         ? `The most you can request from ${d.date} is ${d.maxHours} h/day.`
         : `No hours are free on ${d.date}; pick a later start date.`,
+  }),
+  INVALID_CREDENTIALS: () => ({
+    message: 'Email or password is incorrect.',
+    hint: 'Check both and try again.',
+  }),
+  EMAIL_TAKEN: () => ({
+    message: 'An account with this email already exists.',
+    hint: 'Sign in instead, or use another address.',
+  }),
+  LAST_ADMIN: () => ({
+    message: 'The organization needs at least one admin.',
+    hint: 'Make someone else an admin first.',
+  }),
+  NAME_TAKEN: (d) => ({
+    message: `"${d.name}" already exists.`,
+    hint: 'Pick another name.',
+  }),
+  IN_USE: (d) => ({
+    message: `This ${d.resource} is still in use.`,
+    hint: 'Remove it from projects and assignments first.',
   }),
   UNSUPPORTED_MEDIA_TYPE: () => ({
     message: 'Mutations must be sent as application/json.',

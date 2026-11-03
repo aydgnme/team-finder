@@ -54,7 +54,7 @@ type SkillKey = keyof typeof SKILLS;
 const ROLES = { backend: 'Backend Developer', frontend: 'Frontend Developer', qa: 'QA Engineer' } as const;
 type RoleKey = keyof typeof ROLES;
 
-type PersonKey = 'pat' | 'dana' | 'ana' | 'leo' | 'mira' | 'tom' | 'ines' | 'kai' | 'jo' | 'noor';
+type PersonKey = 'pat' | 'dana' | 'olivia' | 'ana' | 'leo' | 'mira' | 'tom' | 'ines' | 'kai' | 'jo' | 'noor';
 const PEOPLE: Record<
   PersonKey,
   {
@@ -73,6 +73,13 @@ const PEOPLE: Record<
     roles: ['employee', 'deptManager'],
     dept: 'eng',
     persona: 1,
+  },
+  olivia: {
+    name: 'Olivia Grant',
+    title: 'Organization admin',
+    roles: ['employee', 'admin'],
+    dept: null,
+    persona: 3,
   },
   ana: {
     name: 'Ana Silva',
