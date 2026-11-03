@@ -1,4 +1,6 @@
 import {
+  AiDraftResponse,
+  AiStatus,
   ApprovalsResponse,
   AssignmentView,
   CandidatesResponse,
@@ -9,6 +11,7 @@ import {
   SessionInfo,
   SnapshotCreated,
   SnapshotView,
+  type AiSearchRequest,
   type ProposeRequest,
   type ScenarioCommitRequest,
   type SnapshotRequest,
@@ -109,6 +112,8 @@ export const api = {
     }),
   createSnapshot: (body: SnapshotRequest) => request(SnapshotCreated, '/api/snapshots', { method: 'POST', body }),
   snapshot: (id: string) => request(SnapshotView, `/api/snapshots/${encodeURIComponent(id)}`),
+  aiStatus: () => request(AiStatus, '/api/ai/status'),
+  aiSearch: (body: AiSearchRequest) => request(AiDraftResponse, '/api/ai/search', { method: 'POST', body }),
 };
 
 /** The one place errors become user-facing text: message plus hint. */

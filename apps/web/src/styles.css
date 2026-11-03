@@ -1049,3 +1049,100 @@ kbd {
 .snapshot-cta .btn {
   margin-bottom: 12px;
 }
+
+/* ---- AI drafts (M1.75) ---- */
+.ai-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 6px 8px;
+  margin-bottom: 10px;
+}
+.ai-panel-off {
+  background: var(--surface-muted);
+  font-size: 13px;
+}
+.ai-panel-off p {
+  margin: 0;
+}
+.ai-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-title {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ai-form input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 14px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+.ai-note {
+  font-size: 12px;
+}
+.ai-result {
+  margin-top: 10px;
+  font-size: 13px;
+}
+.ai-result p {
+  margin: 6px 0 0;
+}
+.ai-items,
+.ai-rationale {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ai-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--surface-muted);
+}
+.ai-item-name {
+  font-weight: 600;
+}
+.ai-item-verdict {
+  flex-basis: 100%;
+  font-size: 12px;
+}
+.ai-item-fits .ai-item-verdict {
+  color: var(--accent);
+}
+.ai-item-conflict .ai-item-verdict {
+  color: var(--conflict);
+}
+.ai-item-rejected {
+  color: var(--text-muted);
+}
+.ai-rationale {
+  margin-top: 8px;
+  color: var(--text-muted);
+}
+.ai-rationale li {
+  margin-bottom: 4px;
+}
+.ai-rationale li::before {
+  content: '· ';
+}
+
+/* Drag needs both ends on screen: on wide screens the candidate list scrolls on its own, sticky
+   beside the slots, so reaching a card never scrolls the slots away. Stacked below 768px. */
+@media (min-width: 768px) {
+  .canvas > .sidebar {
+    position: sticky;
+    top: 8px;
+    max-height: calc(100vh - 88px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 4px;
+  }
+}
