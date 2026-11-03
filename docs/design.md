@@ -218,16 +218,17 @@ Web service. GitHub Actions: lint + typecheck + tests on PR; deploy on merge to 
 *Order revised by /plan-ceo-review (SCOPE EXPANSION, 2026-11-03): recruiter-visible scope first, full SRS still the goal.*
 - **M0 (1 evening):** pnpm workspace, TS configs, Vite app, Fastify app, CI (lint, typecheck, Vitest with MongoMemoryReplSet, Playwright, API boot smoke), `/api` proxy rewrite, Render blueprint (no corepack), lazy DB connect. *Scaffold done locally; deploy pending accounts.*
 - **M1 (weekend slice):** domain `overlaps`, `buildTimeline`, `withProposal`, `classifyAvailability`, `scoreCandidate`, `rankCandidates`, `can`, `DomainError`; `orgRepo` hardening; sessions + `resolveActor`; per-visitor sandbox from the 8-employee seed; `pnpm dev:local`; candidates endpoint; canvas (drag + keyboard, capacity bar, coverage meter, drop popover, landing on Atlas, coach-mark); propose; approvals inbox; approve/reject with `withTransaction`; e2e propose-then-approve; deploy; first GIF.
-- **M1.5 Staffing decisions (expansion):** scenario fork + start-date scrubber + verdict, atomic scenario commit, share snapshots, "Start over", undo proposal, keyboard shortcuts, capacity bar breakdown, copy team as Markdown. Re-record GIF.
+- **M1.5 Staffing decisions (expansion, time-boxed to 2 weekends):** one fork against the current team (baseline A vs draft B) + start-date scrubber + verdict as the goal line, atomic scenario commit (moves project dates when the start changed), server share snapshots, "Start over". Re-record GIF.
+- **M1.75 AI-01 (moved up at /autoplan #2):** LLM drafts a team, engine validates, results shown on the scrubber canvas; eval set. One loop: "AI drafts, engine proves, scrubber shows when it works".
 - **M2:** real auth (Auth-01/02/03, invite URL), Role-01 permission matrix, Role-02 team roles, tenant-isolation test suite.
-- **M2.5:** AI-01 (LLM drafts team, engine validates) + eval set; "Watch the race" page; README with "Hard problems"; ADR 0001.
-- **M2.75:** team-level "why this team" counterfactuals (`teamDelta`).
+- **M2.5:** "Watch the race" page (real `approve()` with `afterRead` barrier) + `pnpm demo:race`; README with quantified headline and "Hard problems"; `docs/architecture.md` (concurrency proof, scenario verdict); ADR 0001.
+- **Polish bucket (after M2.5, first to slip):** undo proposal, keyboard shortcuts, capacity bar breakdown, copy team as Markdown, team counterfactuals (`teamDelta`).
 - **M3:** Departments (01-03), Skills (01-02), Projects CRUD with status rules (Project-01), views (Project-06..09), deallocation (Project-04/05).
 - **M4:** Skill-03 endorsements, Skill-04 validation, Project-10 requirements, Project-11 upgrade proposals, Notification-01.
 - **M5:** Stats-01 (pie charts), 60-person seed template.
 - **M7:** README polish, final GIF, architecture diagram (`docs/architecture.md`), timed walkthroughs with 5 reviewers, extended e2e.
 
-**If time runs short:** never cut M0-M2.5, M1.5 or M7. Cut in this order (last-in, first-out from SRS breadth): Project-11, Skill-03, Stats-01, Notification-01, Skill-04, Project-10, then M2.75. Full SRS remains the goal; this order only decides what slips.
+**If time runs short:** never cut M0-M2.5 or M7. Cut first: the polish bucket (counterfactuals, then delight items), then SRS breadth last-in, first-out: Project-11, Skill-03, Stats-01, Notification-01, Skill-04, Project-10. Full SRS remains the goal.
 
 ## What I noticed about how you think
 - Offered "Explainable match" as the recommended hero, you picked "Team builder canvas." You chose the thing you can *touch* over the thing that's easiest to explain. That's a taste call, and it is the more memorable demo.
@@ -585,15 +586,15 @@ ENG DUAL VOICES — CONSENSUS TABLE (Codex unavailable; primary review vs Claude
 **Vision.** From staffing *forms* to staffing *decisions*: compare teams across time, see the cost of each option, commit one safely. CEO plan: `~/.gstack/projects/team-finder/ceo-plans/2026-11-03-staffing-decisions.md` (9/9 proposals accepted by the user).
 
 ### Accepted scope specs (done-when + tests)
-**E1 Scenarios (M1.5).** Fork up to 3 drafts of the current canvas (tabs A/B/C, React state only; lost on reload by design). Scrubber moves the project start date *keeping duration* (fixed projects: deadline shifts with it; ongoing: open-ended), within project start .. start + 6 weeks. The candidates response includes timelines covering W ∪ the full scrub range, so the client recomputes availability/ghosts live with `classifyAvailability`; the ranked order is refetched 300ms after the slider is released (`GET /api/projects/:id/candidates?start=YYYY-MM-DD`, cached per date). Verdict (pure `compareScenarios(a, b)` in domain): coverage %, overbooked person-days, start delay, slots unfilled. Commit = `POST /api/projects/:id/scenario-commit` creating all proposals in **one transaction, all-or-nothing**; on failure the error names the slot. *Done when:* two drafts show different verdicts on the seeded Atlas, committing one creates its proposals, a stale slot rolls everything back. *Tests:* `compareScenarios` table tests, scrub-range timeline property test, API test for atomic rollback, e2e fork -> scrub -> commit.
+**E1 Scenarios (M1.5).** Fork one draft (B) of the current team (baseline A) (React state only; lost on reload by design, with a `beforeunload` warning). *(Changed from tabs A/B/C at /autoplan #2.)* Scrubber moves the project start date *keeping duration* (fixed projects: deadline shifts with it; ongoing: open-ended), within project start .. start + 6 weeks. The candidates response includes timelines covering W ∪ the full scrub range, so the client recomputes availability/ghosts live with `classifyAvailability`; the ranked order is refetched 300ms after the slider is released (`GET /api/projects/:id/candidates?start=YYYY-MM-DD`, cached per date). Verdict (pure `compareScenarios(a, b)` in domain): coverage %, overbooked person-days, start delay, slots unfilled. Commit = `POST /api/projects/:id/scenarios/commit` creating all proposals in **one transaction, all-or-nothing**; on failure the error names the slot. *Done when:* two drafts show different verdicts on the seeded Atlas, committing one creates its proposals, a stale slot rolls everything back. *Tests:* `compareScenarios` table tests, scrub-range timeline property test, API test for atomic rollback, e2e fork -> scrub -> commit.
 
-**E2 "Watch the race" (M2.5).** Page `/how-it-works`. `POST /api/demo/race` (isDemo only, 5 runs/min/session) creates two proposals for the same person whose combined hours exceed 8, then runs `approveWithLatch()` twice in parallel: each transaction reads capacity, waits at an in-process barrier until both have read, then writes, guaranteeing a real write conflict; the driver replays the loser, whose recheck throws `CAPACITY_EXCEEDED`. The real `approve()` is untouched. The page renders both real results and the transaction timeline (start, read, wait, write, conflict, replay). If both succeed: red "INVARIANT BROKEN" banner + error log. Proposals reset after each run. *Tests:* API test asserting exactly one success and one `CAPACITY_EXCEEDED` over 20 runs; e2e clicks the button and sees one ✓ one ✗.
+**E2 "Watch the race" (M2.5).** Page `/how-it-works`. `POST /api/demo/race` (isDemo only, 5 runs/min/session) creates two proposals for the same person whose combined hours exceed 8, then runs the real `approve()` twice in parallel with an injected `afterRead` barrier: each transaction reads capacity, waits at an in-process barrier until both have read, then writes, guaranteeing a real write conflict; the driver replays the loser, whose recheck throws `CAPACITY_EXCEEDED`. The production path passes no hook. The page renders both real results and the transaction timeline (start, read, wait, write, conflict, replay). If both succeed: red "INVARIANT BROKEN" banner + error log. Proposals reset after each run. *Tests:* API test asserting exactly one success and one `CAPACITY_EXCEEDED` over 20 runs; e2e clicks the button and sees one ✓ one ✗.
 
 **E3 Team counterfactuals (M2.75).** Pure `teamDelta(team, {slotRoleId, out, in})` -> `{coverageBefore, coverageAfter, overbookDelta, freedHours: [{userId, projectId, hours}], startDelay}`, computed from existing scores and timelines; shown in a slot popover ("Swap Mira for Tom: coverage 100% -> 80%, frees 4h of Mira for Orion") and a keyboard-accessible panel. *Tests:* table tests incl. swap into an empty slot and swap that causes overbooking.
 
-**E4 Share snapshots (M1.5).** `POST /api/snapshots` stores an immutable `{draft, timelines, verdict, orgName, isDemo}` in a non-tenant `snapshots` collection with its own `expiresAt` (90 days, TTL index), independent of the sandbox's 24h life. `GET /api/snapshots/:id` (id = 128-bit random): public when `isDemo`, otherwise requires a session in the same org. This is the one read path outside `orgRepo`; it is a single function with its own test. Page `/s/:id` renders read-only. *Tests:* demo snapshot readable anonymously after its sandbox expired; real-org snapshot 401 without session, 403 other org; expired -> 404 page.
+**E4 Share snapshots (M1.5).** `POST /api/snapshots` stores an immutable `{draft, timelines, verdict, orgName, isDemo}` in a non-tenant `snapshots` collection with its own `expiresAt` (demo 30 days, real-org 90 days; TTL index), independent of the sandbox's 24h life. `GET /api/snapshots/:id` (id = 128-bit random): public when `isDemo`, otherwise requires a session in the same org. This is the one read path outside `orgRepo`; it is a single function with its own test. Page `/s/:id` renders read-only. *Tests:* demo snapshot readable anonymously after its sandbox expired; real-org snapshot 401 without session, 403 other org; expired -> 404 page.
 
-**Delight (M1.5).** Undo: a 10s toast after propose; `DELETE /api/assignments/:id` works only while status is `proposed` and `version` matches, else `CONFLICT_STALE` ("Too late, Dana already approved it"). Keyboard map: `/` focus candidate search; with a candidate focused, `1`-`9` sends it to slot N (same action as "Add to slot"); `?` shows the map; no shortcuts while typing in inputs. Capacity bar breakdown: hover/focus lists projects, hours and until-dates. Copy team as Markdown: client-side from canvas state. Start over: `POST /api/demo/sessions` again (new sandbox clone, new session), canvas reloads on Atlas.
+**Delight (M1.5).** Undo: a 10s toast after propose; `POST /api/assignments/:id/withdraw` (version in body) works only while status is `proposed` and `version` matches, else `CONFLICT_STALE` ("Too late, Dana already approved it"). Keyboard map: `/` focus candidate search; with a candidate focused, `1`-`9` sends it to slot N (same action as "Add to slot"); `?` shows the map; no shortcuts while typing in inputs. Capacity bar breakdown: hover/focus lists projects, hours and until-dates. Copy team as Markdown: client-side from canvas state. Start over: `POST /api/demo/sessions` again (new sandbox clone, new session), canvas reloads on Atlas.
 
 ### Review sections (new scope only; the rest was covered by /autoplan an hour earlier)
 - **1 Architecture:** drafts client-side (1A); snapshots outside tenancy behind one audited function; race latch isolated to the demo path. No new services. Dependency: keep-warm/pinger is a prerequisite for the "10 seconds" vision.
@@ -610,18 +611,139 @@ ENG DUAL VOICES — CONSENSUS TABLE (Codex unavailable; primary review vs Claude
 
 **Spec review of the CEO plan:** 1 round, 5/10, 11 issues: 9 fixed in the specs above, 2 decided by you (race latch, milestone order). Scope concern ("9/9 accepted") noted; you chose expansion mode deliberately, and order 7A protects the rest of the plan.
 
+## /autoplan #2 — expansion scope review (2026-11-03) [subagent-only: Codex usage limit]
+
+### Phase 1: CEO (expansion scope)
+**Premise gate:** confirmed by the user; challenges carried to the final gate as taste decisions (user's earlier choices are the default).
+
+**0A Premises.** (1) scenario scrubber is the hero and precedes SRS breadth; (2) a live race demo beats README prose; (3) share snapshots justify a tenancy exception; (4) delight items belong in M1.5; (5) AI-01 follows scenarios. All five held as stated; 1-5 each carry a challenge (see gate).
+**0B Existing leverage.** Every expansion reuses `CapacityTimeline`, `withProposal`, `rankCandidates`, the approve transaction and per-visitor sandboxes from M1; nothing new at the infrastructure level except the `snapshots` collection.
+**0C Dream state.** CURRENT: M0 live, M1 in progress (cloud session) -> THIS SCOPE: one memorable staffing decision + visible concurrency proof -> 12-MONTH: "AI drafts, engine proves, scrubber shows when it works" as one loop, shipped and walkthrough-tested.
+**0C-bis Alternatives.** A) as accepted (3 tabs, server snapshots, separate latch, delight in M1.5); B) narrowed (one fork vs current, URL-hash share, latch hook inside real approve, delight in a polish bucket); C) hero loop (AI-01 + scrubber together in M1.5, counterfactuals folded into the verdict). Close call between A and B -> taste decisions at gate.
+**0D Auto-decided (mechanical):** keep-warm/uptime pinger moves into **M1** (vision depends on it); seeded landing state where a 2-week scrub closes Atlas's Backend gap, with a one-line caption; README leads with one quantified decision ("Waiting 2 weeks: coverage 80% -> 100%, 0 overbooked days"), concurrency proof second; product copy claims *explainable* team decisions, not novel scenario planning; M1.5 time-boxed to 2 weekends; README states shipped scope honestly (no "full SRS" claim until shipped).
+**0E Temporal.** Hour 1: decide fork model (1 vs 3) before building tabs. Hour 2-3: scrub range timelines double payload size; cap at 60 candidates. Hour 4-5: latch placement decides what the race proves. Hour 6+: GIF re-record after M1.5.
+
+**Sections 1-10 (delta over the earlier expansion review):** Architecture: snapshot read path is the only tenancy exception (taste T3 can remove it). Errors: unchanged registry (see "/plan-ceo-review — SCOPE EXPANSION"). Security: URL-hash share would carry seeded fake data only in demo; real orgs would need the server path anyway. Data/UX edge cases: scrub that makes the project overlap its own deadline blocked by range. Quality: no new findings. Tests: race test must exercise the same `approve()` code that production uses (supports T2 = hook in real approve). Performance: scrub-range timelines bounded (<= 60 candidates x ~20 segments). Observability: `race_run` logs replay count to prove the conflict happened. Deployment: no new infra. Trajectory: biggest regret risk is polishing expansions while M2 auth and tenancy stay half-built; mitigated by the 2-weekend box and order 7A.
+
+**NOT in scope (this pass):** claiming scenario planning as novel; multi-user real-time co-editing of scenarios.
+**Dream-state delta:** with B or C at the gate, v1 lands one sharp hero loop; with A, more surface at more schedule risk.
+
+> **Phase 1 complete.** Codex: unavailable. Claude subagent: 8 findings (6 auto-decided, 6 taste decisions). Consensus: N/A (single voice), 3 dimensions flagged.
+
+### Phase 2: Design (expansion surfaces)
+**Initial completeness 4/10** (mechanics specified, layout/states/a11y not). Litmus (subagent): unmistakable first screen NO, one anchor NO, scannable headlines NO, one job per section NO, cards necessary YES (verdict inline), motion improves hierarchy NO, premium without shadows YES. All structural gaps auto-fixed below.
+
+**Pass 1 Hierarchy (3 -> 8).** The verdict *is* the goal line; fork tabs and scrubber share one row; slots stay above the fold at 768px.
+```
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│ Atlas · Draft B vs A: start +2 wk -> Backend 100%, 0 overbooked days, 1 slot open   │ verdict = goal line
+│ [A][B][+ Fork]     Start  Mon Mar 2 ◀━━━━━━●━━━━▶ +6 wk   (re-ranking…)             │ one control row
+├──────────────────────────────────────────────────┬─────────────────────────────────┤
+│ ROLE SLOTS                                        │ CANDIDATES                      │
+```
+**Pass 2 States (3 -> 8).** Scrubber: stale ranks dimmed with "re-ranking…", end-of-range hint "+6 wk max". Fork: one draft shows "Fork to compare"; tab A is the baseline, every verdict is a diff against A. Commit: button spinner, then success toast "3 proposals sent", committed draft becomes the new A, other tabs kept; `beforeunload` warning while unsaved drafts exist. Share: "Link copied" toast; share page header "Snapshot · Nov 3 · read-only" + CTA "Try the live demo"; expired page as specified earlier. Race page: idle / running (both lanes animate) / result / `RATE_LIMITED` ("Try again in 30s") / waking. Undo toast: in-flight spinner, max one toast (a newer drop replaces it), timer pauses on hover/focus, keyboard reachable (`Tab` to Undo), satisfying WCAG 2.2.1.
+**Pass 3 Journey (4 -> 8).** Coach-mark 1 now points at the scrubber ("Drag start to Mar 16"); the seeded Atlas state makes that move close the Backend gap and flip the verdict. Drag-and-approve follows (coach-mark 2). Hero moment lands at ~20s after load.
+**Pass 4 AI slop (5 -> 8).** Verdict is one inline sentence with Plex Mono numbers, never KPI cards. Race timeline = two swimlanes on a shared ms axis; barrier drawn as a vertical rule; the losing write marked red with the real replay; real step order and real ms labels from the API response.
+**Pass 5 Design system (7 -> 8).** DESIGN.md gains: control row, verdict line, swimlane anatomy, slider tokens.
+**Pass 6 Responsive & a11y (3 -> 8).** Scrubber keyboard: arrows = 1 day, PageUp/PageDown = 1 week, `aria-valuetext="Start Mon Mar 16, 2 weeks later"`; refetch debounced on keyup as well as pointerup; verdict in `aria-live="polite"` announced on settle only; digit shortcuts disabled while the slider or any input has focus. <768px: scrubber pinned full-width above the bottom sheet with a 44px thumb; tabs collapse to a select.
+**Pass 7 Motion (new rule).** While scrubbing, availability chips update in place; list reorders only on settle with a 240ms FLIP; respects `prefers-reduced-motion`.
+
+> **Phase 2 complete.** Codex: unavailable. Claude subagent: 7 findings, all structural, all auto-fixed. Design 4/10 -> 8/10.
+
+### Phase 3: Eng (expansion scope)
+```
+ENG VOICES [subagent-only]: architecture partial · tests partial · performance yes · security NO · error paths partial · deployment yes
+```
+```
+ approve(ctx, {afterRead?})  ── production: afterRead = undefined
+        ▲                      └ race demo: afterRead = runBarrier.wait() (first attempt only, 2s timeout)
+        │
+ POST /api/demo/race ──(per-session lock)──▶ two approve() calls on hidden race person × 2 hidden projects ──▶ finally: cleanup
+ POST /api/projects/:id/scenarios/commit ─▶ withTransaction: [date-edit clamp if start changed] → proposals (session reads) → touchProject once
+ POST /api/snapshots {draftIds…} ─▶ server rebuilds timelines + verdict ─▶ snapshots{orgId,isDemo,expiresAt}
+ GET  /api/snapshots/:id ─▶ expiresAt > now ✓ ─▶ isDemo ? public : can(actor,'viewSnapshot', orgId)
+ POST /api/assignments/:id/withdraw {version} ─▶ can(actor,'withdrawAssignment') ─▶ txn: delete + notification + touchProject
+```
+**Auto-decisions (all P1/P5, logged):**
+1. **Race latch hang:** barrier is per run, waits only on the first `withTransaction` attempt, 2s timeout; per-session lock on `/api/demo/race` (double-click returns 409 `RACE_IN_PROGRESS`).
+2. **Race proves the real code (resolves gate item T2):** `approve(ctx, opts)` gains an optional `afterRead` hook (no-op in production); the demo injects the barrier. No `approveWithLatch` copy. Tests: 20-run exactly-one-winner, and "replay never waits at the barrier".
+3. **Race fixtures:** each sandbox seeds a hidden race person and two hidden projects (excluded from canvas queries by a `demoInternal` flag); cleanup in `finally`.
+4. **Scrubbed commit:** if the draft start differs from the project start, the same transaction runs the date-edit clamp and overbooking recheck (moving the project), then creates proposals. Scrubber disabled for already-started projects; range = `max(today, start)` .. +6 wk; `?start=` validated server-side.
+5. **Snapshot ownership:** snapshots store `orgId` (not just name); create/read for real orgs gated by `can()` (PM, dept manager, admin); employees cannot read others' allocations.
+6. **Snapshot integrity:** client sends draft ids/slots only; server recomputes timelines and verdict; zod-validated, <= 64KB, rate-limited; Markdown/text escaped on render; demo snapshots TTL 30 days (real-org 90).
+7. **Expiry check:** `GET` checks `expiresAt > now` (TTL lag ~60s).
+8. **CSRF hook vs DELETE:** undo sends the version in `If-Match`; bodyless DELETE is exempt (cross-site DELETE is preflighted); all POSTs keep a JSON body (client sends `{}`), so the 415 rule stays strict.
+9. **Undo rules:** `can(actor,'withdrawProposal')` (PM of project), via `orgRepo`, in a transaction with `touchProject`, deletes the `assignmentProposed` notification.
+10. **Scenario commit checks:** slot counts include proposals inserted earlier in the same transaction (session reads); per-draft duplicate-user and per-person `NO_APPROVER` checks; unique partial index `{orgId, projectId, userId}` where status is non-terminal backs the one-per-project rule; `touchProject` once; no `capacityVersion` bumps (proposals don't consume capacity); draft size <= total slot count.
+11. **Determinism:** domain functions take `today` as a parameter; e2e freezes the clock; per-date ranking cache invalidated on any mutation.
+12. **DRY:** one `coverage()` used by `teamDelta` and `compareScenarios`.
+
+**Test diagram (expansion):**
+```
+domain:  compareScenarios ★★★ table · coverage() ★★★ · teamDelta ★★★ incl. overbooking swap · scrub-range timeline property test
+api:     scenarios/commit ★★★ (atomic rollback, slot-count within txn, duplicate user, NO_APPROVER, moved start) [→INTEGRATION]
+         race ★★★ (20 runs exactly one winner, replay skips barrier, 2s timeout, lock → RACE_IN_PROGRESS, cleanup on throw)
+         snapshots ★★★ (server-rebuilt content, size cap, demo public, real-org can(), employee 403, expired 404 incl. TTL lag)
+         undo ★★★ (proposed only, If-Match mismatch → CONFLICT_STALE, notification removed, wrong PM → FORBIDDEN)
+e2e:     [→E2E] scrub → verdict flips → commit; share → private window; race page one ✓ one ✗; undo within 10s; keyboard slider
+```
+**NOT in scope:** cross-instance race (single request runs both transactions; one Render instance is fine).
+**Failure modes:** no critical gaps after fixes (race hang, forged snapshots, undo 415 were the silent/broken ones).
+
+> **Phase 3 complete.** Codex: unavailable. Claude subagent: 12 findings, all accepted (T2 resolved as a correctness fix).
+
+### Phase 3.5: DX (expansion scope)
+**Persona:** reviewer with 10 minutes who wants to *verify* the concurrency claim, not just read it. **TTHW for the race proof:** today ~10+ min (needs `dev:local`, a sandbox, the page) -> target **one command, < 2 min**.
+**Journey delta:** discover (README "Hard problems") -> `pnpm demo:race` -> prints timeline + `1 ok, 1 CAPACITY_EXCEEDED, replays=1` -> click through to the test file -> read `docs/architecture.md#concurrency-proof`.
+**Empathy narrative.** "The README says two approvals can't overbook. I want to see it. If I have to boot two servers and click through a sandbox, I'll skip it. If one command prints the race with the replay count, I'll trust the rest."
+**Auto-decisions:**
+1. `pnpm demo:race` runs the race against MongoMemoryReplSet and prints both lanes, result and replay count; README "Hard problems" links it and the race test file.
+2. Naming aligned with the route table: undo = `POST /api/assignments/:id/withdraw` (version in JSON body, like approve/reject); permission `withdrawAssignment`; UI label "Undo". This **supersedes eng #8**: no `If-Match`, no DELETE exemption, the 415 rule stays universal. Scenario commit = `POST /api/projects/:id/scenarios/commit`.
+3. Route table additions: `POST /api/projects/:id/scenarios/commit`, `POST /api/snapshots`, `GET /api/snapshots/:id`, `POST /api/demo/race`, `POST /api/assignments/:id/withdraw`, `GET /api/projects/:id/candidates?start=`.
+4. Canonical error codes gain (with hints): `RACE_IN_PROGRESS` ("a run is already in progress; wait for it to finish"), `RACE_TIMEOUT` ("barrier not reached in 2s; retry"), `DEMO_ONLY` ("demo sandboxes only; run pnpm dev:local"), `INVARIANT_BROKEN` (logged at error; "please file an issue"). Slot failures carry `details.slotRoleId`.
+5. `docs/architecture.md` "Concurrency proof" (afterRead diagram, why replays skip the barrier, test link) and "Scenario verdict" (`compareScenarios`, `coverage()`) written **with M2.5**, not deferred to M7.
+6. `DEMO_ROUTES_ENABLED` env gate (default on in dev and the demo deployment); race rate limit relaxed when `NODE_ENV !== production`; a unit test asserts only the demo route passes `afterRead`; one test checks `demoInternal` exclusion on candidates, stats, notifications and snapshots.
+7. TTLs settled: demo snapshots 30 days, real-org snapshots 90 days (E4 text updated by this decision). Upgrade note: the new unique partial index is created before any production data exists; README "Upgrading" documents creating it on existing data.
+
+**DX scorecard (expansion):** getting started 4 -> 8 · naming 6 -> 9 · errors 6 -> 8 · docs 3 -> 8 · upgrade 6 -> 7 · environment 6 -> 8. **Overall 5/10 -> 8/10.**
+**Checklist:** `demo:race` · route table · error codes + hints · architecture.md sections · `DEMO_ROUTES_ENABLED` · afterRead usage test · demoInternal exclusion test · TTL constants.
+
+> **Phase 3.5 complete.** DX 5/10 -> 8/10; race-proof TTHW ~10 min -> < 2 min. Codex: unavailable. Claude subagent: 6 findings, all accepted.
+
+### Cross-phase themes (#2)
+- **Prove, don't claim** — CEO (race must run the real code), Eng (#2 afterRead hook), DX (`pnpm demo:race`). High-confidence: the concurrency proof is the project's strongest asset; it must be the real path and one command away.
+- **Focus of M1.5** — CEO (second MVP risk), Design (three bands compete for the first screen). Carried to the gate (fork model, delight bucket).
+
+### Decision Audit Trail (#2)
+| # | Phase | Decision | Class | Principle | Rejected |
+|---|---|---|---|---|---|
+| 1 | CEO | Premises confirmed | User gate | — | revise |
+| 2 | CEO | Keep-warm into M1 | Mechanical | P1 | later |
+| 3 | CEO | Seeded "2-week scrub closes gap" landing | Mechanical | P1 | generic landing |
+| 4 | CEO | README leads with quantified decision | Mechanical | P1 | feature list |
+| 5 | CEO | Claim explainability, not novelty | Mechanical | P5 | "unique scenarios" |
+| 6 | CEO | M1.5 time-box 2 weekends; honest-scope README | Mechanical | P6 | open-ended |
+| 7 | CEO | T1 fork model: one fork vs baseline | Taste -> **user chose** | P5 | tabs A/B/C |
+| 8 | CEO | T2 latch inside real approve() | Taste -> resolved by Eng #2 | P1 | separate copy |
+| 9 | CEO | T3 snapshots: server-side | Taste -> **user kept** | P1 | URL-hash |
+| 10 | CEO | T4 delight items -> polish bucket | Taste -> **user chose** | P6 | M1.5 |
+| 11 | CEO | T5 AI-01 -> M1.75 after scrubber | Taste -> **user chose** | P1 | M2.5 |
+| 12 | CEO | T6 counterfactuals -> polish bucket | Taste -> **user chose** | P6 | M2.75 |
+| 13-19 | Design | verdict = goal line; one control row; fork baseline A; states for scrubber/commit/share/race/undo; coach-mark to scrubber; swimlane timeline; scrubber keyboard + mobile + FLIP motion | Mechanical | P5/P1 | — |
+| 20-31 | Eng | latch per run + timeout + lock; afterRead hook; hidden race fixtures; scrubbed commit moves dates; snapshot orgId + can(); server-rebuilt snapshots + caps; expiry check; (#8 superseded by DX #2); undo can()+txn+notification; commit in-txn checks + unique index; `today` param + frozen clock; one coverage() | Mechanical | P1/P5 | — |
+| 32-38 | DX | demo:race; route renames; route table; error codes + hints; architecture.md with M2.5; DEMO_ROUTES_ENABLED + tests; TTLs settled | Mechanical | P1/P5 | — |
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
-| CEO Review | `/plan-ceo-review` | Scope & strategy | 2 | CLEAR | 9 proposals, 9 accepted, 0 deferred (SCOPE_EXPANSION, interactive); 0 critical gaps |
-| Codex Review | `/codex review` | Independent 2nd opinion | 2 | ISSUES FOUND (folded) | eng outside voice 7/7 accepted; CEO voice 7 concerns; later voices unavailable (usage limit) |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 2 | CLEAR (PLAN via /autoplan) | 36 + 15 issues, 0 critical gaps; new M1.5/M2.5 scope not yet eng-reviewed |
-| Design Review | `/plan-design-review` | UI/UX gaps | 1 (via /autoplan) | CLEAR | score: 3/10 -> 8/10, 9 decisions; scrubber/scenario UI not yet reviewed |
-| DX Review | `/plan-devex-review` | Developer experience gaps | 1 (via /autoplan) | CLEAR | score: 4/10 -> 7.5/10, TTHW: 15-30 min -> under 3 min |
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 3 | CLEAR (via /autoplan #2) | expansion: 8 findings, 6 auto, 5 taste decided by user (+1 resolved by eng), 0 critical gaps |
+| Codex Review | `/codex review` | Independent 2nd opinion | 2 | ISSUES FOUND (folded) | unavailable this run (usage limit until 2026-11-04 12:15) |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 3 | CLEAR (PLAN via /autoplan) | expansion: 12 issues, 0 critical gaps |
+| Design Review | `/plan-design-review` | UI/UX gaps | 2 | CLEAR (via /autoplan) | expansion score: 4/10 -> 8/10, 7 decisions |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 2 | CLEAR (via /autoplan) | expansion score: 5/10 -> 8/10, race-proof TTHW ~10 min -> < 2 min |
 
-- **CODEX:** unavailable for this CEO pass (usage limit until 2026-11-04 12:15); independent Claude spec reviewer used instead.
-- **CROSS-MODEL:** both earlier CEO voices called the scrubber the most distinctive idea; this review made it core (M1.5).
-- **VERDICT:** CEO + ENG + DESIGN + DX CLEARED for M0-M1. Eng and design review recommended for the new M1.5/M2.5 scope before building it.
+- **CROSS-MODEL:** single voice (Claude subagent) in all four phases of /autoplan #2; no user challenges possible without a second model.
+- **VERDICT:** CEO + DESIGN + ENG + DX CLEARED for M1.5, M1.75, M2.5 and the polish bucket; milestone plans in `docs/plans/`.
 
 NO UNRESOLVED DECISIONS
