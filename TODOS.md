@@ -1,13 +1,5 @@
 # TODOS
 
-## AI-01 eval set
-- **What:** ~20 golden natural-language prompts (e.g. "2 senior React devs + a QA from March") with the expected filter JSON, run in CI against the real model.
-- **Why:** model or prompt changes can silently break NL search; the canvas would get wrong filters with no failing test.
-- **Pros:** catches prompt/model regressions; a concrete "how I test LLM features" artifact for interviews.
-- **Cons:** costs API calls per CI run; needs an API key as a CI secret (run on main only, or nightly).
-- **Context:** AI-01 lands in M2.5 (see docs/design.md, "AI-01" and milestones). The LLM only outputs `{skills:[{skillId,minLevel}], roles, availability options, startDate}` against the org's vocabulary; the deterministic engine ranks. Evals compare that JSON field by field against expectations, tolerating ordering.
-- **Depends on / blocked by:** AI-01 (M2.5).
-
 ## Realtime updates (SSE) for approvals and notifications
 - **What:** push `proposalDecided` and notification events to open clients over Server-Sent Events instead of 30s polling.
 - **Why:** in the demo, after approving as Dept Manager and switching back to PM, other open tabs may look stale for up to 30s.
