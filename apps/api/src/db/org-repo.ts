@@ -1,7 +1,7 @@
 import { ObjectId, type ClientSession, type Document, type Filter, type FindOptions, type UpdateFilter } from 'mongodb';
 import { fail } from '@team-finder/domain';
 import type { Database } from './client.ts';
-import type { TenantCollectionName, TenantCollections, TenantDoc } from './documents.ts';
+import { TENANT_COLLECTIONS, type TenantCollectionName, type TenantCollections, type TenantDoc } from './documents.ts';
 
 // Tenant isolation by construction (docs/design.md, invariant 3). Routes and services never see the
 // raw Db: they get orgRepo(actor), which injects orgId into every filter, insert, update and the
@@ -149,10 +149,7 @@ export type OrgRepo = { [K in TenantCollectionName]: ScopedCollection<TenantColl
 
 export function orgRepo(database: Database, scope: RepoScope): OrgRepo {
   const collections = Object.fromEntries(
-    (['users', 'departments', 'teamRoles', 'skills', 'userSkills', 'projects', 'assignments'] as const).map((name) => [
-      name,
-      scopedCollection(database, name, scope),
-    ]),
+    TENANT_COLLECTIONS.map((name) => [name, scopedCollection(database, name, scope)]),
   ) as { [K in TenantCollectionName]: ScopedCollection<TenantCollections[K]> };
 
   return {

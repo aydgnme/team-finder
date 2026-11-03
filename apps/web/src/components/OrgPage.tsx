@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { api, toErrorMessage } from '../lib/api.ts';
 import { useAnnounce } from '../lib/announce.tsx';
 import { href } from '../lib/route.ts';
+import { OrgTabs } from './OrgTabs.tsx';
 
 // Organization screen (Auth-02, Role-01, Role-02). Everyone sees members and team roles; admins
 // also get the invite link, role checkboxes and team-role editing. The server enforces all of it.
@@ -25,14 +26,9 @@ export function OrgPage({ session }: { session: SessionInfo }) {
         <h1 className="goal" data-testid="org-title">
           {session.org.name}
         </h1>
+        <OrgTabs />
       </header>
       <main className="org-page">
-        {!session.landingProjectId && (
-          <p className="note" data-testid="no-projects">
-            No projects yet. Project setup is the next milestone; until then you can invite people and set up roles
-            here, or explore staffing in the <a href="#/">demo</a>.
-          </p>
-        )}
         {isAdmin && <InviteSection />}
         <MembersSection session={session} isAdmin={isAdmin} />
         <TeamRolesSection isAdmin={isAdmin} />

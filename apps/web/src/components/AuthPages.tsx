@@ -14,7 +14,7 @@ function useSignedIn() {
     queryClient.removeQueries();
     queryClient.setQueryData(['session'], info);
     setSessionEnded(false);
-    navigate(info.landingProjectId ? href.canvas(info.landingProjectId) : href.org());
+    navigate(info.landingProjectId ? href.canvas(info.landingProjectId) : href.projects());
   };
 }
 

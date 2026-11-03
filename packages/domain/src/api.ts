@@ -3,6 +3,7 @@ import { AssignmentStatus, CapacityTimeline } from './capacity.ts';
 import { HOURS_PER_DAY } from './constants.ts';
 import { Day } from './dates.ts';
 import { Availability, ExclusionReason, Reason, ROLLING_OFF_WEEKS, ScoreTerms } from './matching.ts';
+import { ProjectStatus } from './projects.ts';
 import { Verdict } from './scenarios.ts';
 import { AccessRole } from './permissions.ts';
 
@@ -66,7 +67,7 @@ export const ProjectBoard = z.object({
     name: z.string(),
     description: z.string(),
     period: z.enum(['fixed', 'ongoing']),
-    status: z.enum(['notStarted', 'starting', 'inProgress', 'closing', 'closed']),
+    status: ProjectStatus,
     startDate: Day,
     deadline: Day.nullable(),
     pmId: Id,

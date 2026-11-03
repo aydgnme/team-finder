@@ -9,3 +9,4 @@ export * from './permissions.ts';
 export * from './scenarios.ts';
 export * from './ai.ts';
 export * from './auth.ts';
+export * from './projects.ts';

@@ -68,6 +68,10 @@ The staffing canvas is the one hero surface; everything else uses the same token
 
 **Organization screen** — the same topbar as the canvas with the org name as the title; sections in order: the "no projects yet" note (real orgs without projects), Invite people (admins: read-only link field, Copy, Replace link), Members (table: name and email, department, access roles as checkboxes for admins or a comma list otherwise; `employee` is implied and never shown as a box), Team roles (list with "in use", Rename, Delete disabled while in use, and an add field). Role checkboxes are optimistic; a refusal puts the box back with the reason under the row. Below 768px the members table stacks.
 
+**Projects screen** — a plain list, one row per project: name (link to the canvas), status pill (grey not started/closed, amber starting/closing, teal in progress), dates in Plex Mono, PM, "filled/total slots". The PM's row adds Edit, a "Move to…" select listing only forward statuses (closing asks for confirmation and reports how many assignments ended or were rejected), and Delete while the project was never active. The create/edit form is one bordered column: name, description, period and status (create only), dates (disabled with a note while people are on the team), team roles with counts, tech stack checkboxes.
+
+**Organization tabs** — Members · Departments · Skills under the org name; the current tab is underlined in accent. Departments: one section per department with Rename/Delete (admins), a manager select (admins), members with Remove, and "Add someone…". Skills: My skills (level and experience selects, Remove, add row) above the catalog grouped by category ("built in" or "by <author>", Delete for authors while unused).
+
 **Dock** — persona switcher ("Viewing as"), Canvas / Approvals (with pending count for managers), org name. Coach-marks (max two, dismissible, remembered in localStorage) appear above it.
 
 ## States

@@ -1298,3 +1298,150 @@ kbd {
     padding: 16px;
   }
 }
+
+/* ---- organization data (M3a) ---- */
+.org-tabs {
+  display: flex;
+  gap: 18px;
+  margin-top: 10px;
+  font-size: 14px;
+}
+.org-tabs a {
+  text-decoration: none;
+  font-weight: 500;
+  padding-bottom: 4px;
+}
+.org-tabs a[aria-current='page'] {
+  border-bottom: 2px solid var(--accent);
+}
+.project-list,
+.plain-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.project-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.project-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  font-size: 14px;
+}
+.project-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+.project-desc {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+.project-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+.status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+}
+.status-starting,
+.status-closing {
+  border-color: var(--pending);
+  color: var(--pending);
+}
+.status-inProgress {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.project-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  max-width: 640px;
+}
+.project-form textarea,
+.project-form select,
+.form-group select {
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.form-row .field {
+  flex: 1 1 180px;
+}
+.form-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.form-group legend {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 4px;
+}
+.inline-field input {
+  width: 64px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+.check-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.dept-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dept-manager {
+  font-size: 14px;
+  margin: 4px 0 0;
+}
+.skill-category .role-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* The dock carries more since M3a; the org label is the first thing to give way. */
+@media (max-width: 1399px) {
+  .dock-org {
+    display: none;
+  }
+  .dock-auth {
+    margin-left: auto;
+  }
+}

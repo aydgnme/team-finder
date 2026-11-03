@@ -65,6 +65,18 @@ export async function setRoles(ctx: ServiceContext, database: Database, userId: 
     await authStore(database).touchRoles(repo.orgId, session);
     const user = await repo.users.findOne({ _id: userId }, { session });
     if (!user) fail('NOT_FOUND', { resource: 'user', id: userId });
+    // Approving needs the role, and nobody else approves for their department: dropping it while
+    // they still manage one would strand that department's pending proposals.
+    if (!next.includes('deptManager')) {
+      const managed = await repo.departments.findOne({ managerId: userId }, { session });
+      if (managed) {
+        fail('VALIDATION', {
+          issues: [
+            { path: 'roles', message: `${user!.name} manages ${managed.name}; pick another manager there first` },
+          ],
+        });
+      }
+    }
     await repo.users.updateOne({ _id: userId }, { $set: { accessRoles: next } }, { session });
     const admins = await repo.users.countDocuments({ accessRoles: 'admin' }, { session });
     if (admins === 0) fail('LAST_ADMIN', {});
@@ -115,9 +127,18 @@ export async function renameTeamRole(ctx: ServiceContext, id: string, name: stri
 
 export async function deleteTeamRole(ctx: ServiceContext, id: string): Promise<{ id: string }> {
   requireAdmin(ctx, 'manage team roles');
-  const role = await ctx.repo.teamRoles.findOne({ _id: id });
-  if (!role) fail('NOT_FOUND', { resource: 'team role', id });
-  if (await teamRoleInUse(ctx, id)) fail('IN_USE', { resource: 'team role' });
-  await ctx.repo.teamRoles.deleteMany({ _id: id });
-  return { id };
+  const { repo } = ctx;
+  // In a transaction that writes the role: a project saved at the same moment touches the same
+  // document (references.ts), so the role cannot vanish under it.
+  return repo.withTransaction(async (session) => {
+    const role = await repo.teamRoles.findOne({ _id: id }, { session });
+    if (!role) fail('NOT_FOUND', { resource: 'team role', id });
+    const [projects, assignments] = await Promise.all([
+      repo.projects.countDocuments({ 'teamRoles.roleId': id }, { session }),
+      repo.assignments.countDocuments({ roleIds: id }, { session }),
+    ]);
+    if (projects + assignments > 0) fail('IN_USE', { resource: 'team role' });
+    await repo.teamRoles.deleteMany({ _id: id }, { session });
+    return { id };
+  });
 }

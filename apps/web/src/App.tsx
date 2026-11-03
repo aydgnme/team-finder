@@ -5,7 +5,10 @@ import { Canvas } from './canvas/Canvas.tsx';
 import { Dock } from './components/Dock.tsx';
 import { NotConfiguredScreen, SessionEndedModal, SetupScreen, WakingScreen } from './components/Screens.tsx';
 import { JoinPage, LoginPage, SignUpPage } from './components/AuthPages.tsx';
+import { DepartmentsPage } from './components/DepartmentsPage.tsx';
 import { OrgPage } from './components/OrgPage.tsx';
+import { ProjectsPage } from './components/ProjectsPage.tsx';
+import { SkillsPage } from './components/SkillsPage.tsx';
 import { SnapshotPage } from './components/SnapshotPage.tsx';
 import { api, errorCode, toErrorMessage } from './lib/api.ts';
 import { href, navigate, useRoute } from './lib/route.ts';
@@ -80,8 +83,14 @@ function DemoApp() {
     <div className="app">
       {route.name === 'approvals' ? (
         <ApprovalsInbox session={info} />
-      ) : route.name === 'org' || !projectId ? (
+      ) : route.name === 'org' ? (
         <OrgPage session={info} />
+      ) : route.name === 'departments' ? (
+        <DepartmentsPage session={info} />
+      ) : route.name === 'skills' ? (
+        <SkillsPage session={info} />
+      ) : route.name === 'projects' || !projectId ? (
+        <ProjectsPage session={info} />
       ) : (
         <Canvas key={`${projectId}-${info.user.id}`} projectId={projectId} session={info} />
       )}

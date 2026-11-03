@@ -27,6 +27,7 @@ export async function createSandbox(database: Database, store: SessionStore, now
     repo.users.insertMany(seed.users),
     repo.departments.insertMany(seed.departments),
     repo.teamRoles.insertMany(seed.teamRoles),
+    repo.skillCategories.insertMany(seed.skillCategories),
     repo.skills.insertMany(seed.skills),
     repo.userSkills.insertMany(seed.userSkills),
     repo.projects.insertMany(seed.projects),

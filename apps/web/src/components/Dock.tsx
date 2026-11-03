@@ -70,10 +70,13 @@ export function Dock({
             Canvas
           </a>
         )}
+        <a href={href.projects()} aria-current={route.name === 'projects' ? 'page' : undefined}>
+          Projects
+        </a>
         <a href={href.approvals()} aria-current={route.name === 'approvals' ? 'page' : undefined}>
           Approvals{isManager && pending !== undefined ? <span className="badge mono">{pending}</span> : null}
         </a>
-        <a href={href.org()} aria-current={route.name === 'org' ? 'page' : undefined}>
+        <a href={href.org()} aria-current={['org', 'departments', 'skills'].includes(route.name) ? 'page' : undefined}>
           Organization
         </a>
       </nav>
@@ -85,6 +88,18 @@ export function Dock({
         <span className="dock-auth">
           <a href={href.signup()}>Create your organization</a>
           <a href={href.login()}>Sign in</a>
+          <button
+            type="button"
+            className="btn btn-small btn-ghost"
+            disabled={startingOver}
+            title="A fresh copy of the demo: every change you made is discarded"
+            onClick={() => {
+              navigate('#/');
+              onStartOver();
+            }}
+          >
+            {startingOver ? 'Starting over…' : 'Start over'}
+          </button>
         </span>
       ) : (
         <span className="dock-auth">
@@ -95,20 +110,6 @@ export function Dock({
             Sign out
           </button>
         </span>
-      )}
-      {session.org.isDemo && (
-        <button
-          type="button"
-          className="btn btn-small btn-ghost"
-          disabled={startingOver}
-          title="A fresh copy of the demo: every change you made is discarded"
-          onClick={() => {
-            navigate('#/');
-            onStartOver();
-          }}
-        >
-          {startingOver ? 'Starting over…' : 'Start over'}
-        </button>
       )}
 
       {step === 'switchToManager' && manager && session.user.id !== manager.id && (

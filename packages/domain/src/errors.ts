@@ -47,6 +47,8 @@ export const DomainError = z.discriminatedUnion('code', [
   envelope('LAST_ADMIN', none),
   envelope('NAME_TAKEN', z.object({ name: z.string() })),
   envelope('IN_USE', z.object({ resource: z.string() })),
+  envelope('TRANSITION_NOT_ALLOWED', z.object({ from: z.string(), to: z.string() })),
+  envelope('NOT_DELETABLE', z.object({ reason: z.string() })),
   envelope('UNSUPPORTED_MEDIA_TYPE', z.object({ contentType: z.string().optional() })),
   envelope('DB_UNAVAILABLE', none),
   envelope('AI_UNAVAILABLE', z.object({ reason: z.string().optional() })),
@@ -72,6 +74,8 @@ export const HTTP_STATUS: Record<ErrorCode, number> = {
   LAST_ADMIN: 409,
   NAME_TAKEN: 409,
   IN_USE: 409,
+  TRANSITION_NOT_ALLOWED: 409,
+  NOT_DELETABLE: 409,
   UNSUPPORTED_MEDIA_TYPE: 415,
   RATE_LIMITED: 429,
   INTERNAL: 500,
@@ -140,6 +144,14 @@ const TEXTS: { [C in ErrorCode]: Texts<C> } = {
   IN_USE: (d) => ({
     message: `This ${d.resource} is still in use.`,
     hint: 'Remove it from projects and assignments first.',
+  }),
+  TRANSITION_NOT_ALLOWED: (d) => ({
+    message: `A project cannot go from ${d.from} to ${d.to}.`,
+    hint: 'Status only moves forward: not started, starting, in progress, closing, closed.',
+  }),
+  NOT_DELETABLE: (d) => ({
+    message: `This cannot be deleted: ${d.reason}.`,
+    hint: 'Close it instead.',
   }),
   UNSUPPORTED_MEDIA_TYPE: () => ({
     message: 'Mutations must be sent as application/json.',

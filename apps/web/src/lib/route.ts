@@ -7,7 +7,10 @@ export type Route =
   | { name: 'signup' }
   | { name: 'login' }
   | { name: 'join'; token: string }
-  | { name: 'org' };
+  | { name: 'org' }
+  | { name: 'projects' }
+  | { name: 'departments' }
+  | { name: 'skills' };
 
 /** Screens that work without a session: they must never create a demo sandbox. */
 export const PUBLIC_ROUTES = new Set<Route['name']>(['snapshot', 'signup', 'login', 'join']);
@@ -17,6 +20,9 @@ function parse(hash: string): Route {
   if (hash.startsWith('#/signup')) return { name: 'signup' };
   if (hash.startsWith('#/login')) return { name: 'login' };
   if (hash.startsWith('#/org')) return { name: 'org' };
+  if (hash === '#/projects' || hash === '#/projects/') return { name: 'projects' };
+  if (hash.startsWith('#/departments')) return { name: 'departments' };
+  if (hash.startsWith('#/skills')) return { name: 'skills' };
   const join = /^#\/join\/([^/?]+)/.exec(hash);
   if (join) return { name: 'join', token: decodeURIComponent(join[1]!) };
   const snap = /^#\/s\/([^/?]+)/.exec(hash);
@@ -44,6 +50,9 @@ export const href = {
   login: () => '#/login',
   join: (token: string) => `#/join/${encodeURIComponent(token)}`,
   org: () => '#/org',
+  projects: () => '#/projects',
+  departments: () => '#/departments',
+  skills: () => '#/skills',
 };
 
 export function navigate(to: string) {
