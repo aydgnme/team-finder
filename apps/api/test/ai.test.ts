@@ -76,7 +76,8 @@ describe('POST /api/ai/search', () => {
       hoursPerDay: 8,
       verdict: { kind: 'fits', maxHours: 8 },
     });
-    expect(r.rationale.length).toBeGreaterThan(0);
+    // Refs are turned back into names for the manager (the model only ever saw "c1").
+    expect(r.rationale[0]).toMatch(/^Tom Becker: Senior Backend Developer/);
     expect(r.raw).toMatchObject({ start: '2026-03-23' });
   });
 

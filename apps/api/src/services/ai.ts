@@ -143,7 +143,10 @@ export async function draftTeam(
     start,
     items,
     dropped,
-    rationale: out.rationale.map((r) => r.slice(0, 300)).slice(0, 6),
+    // The model only knows refs; the manager reads names. The mapping never leaves this request.
+    rationale: out.rationale
+      .slice(0, 6)
+      .map((r) => r.slice(0, 300).replace(/\bc(\d{1,2})\b/g, (ref) => refs.get(ref)?.name ?? ref)),
     raw,
     provider: provider.name,
   };
