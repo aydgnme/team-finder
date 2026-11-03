@@ -298,6 +298,12 @@ describe('Skill-04 validation', () => {
       validated: true,
     });
 
+    // Raising and then taking the raise back needs no validation: it is the validated value again.
+    await call(app, ana, 'PUT', `/api/me/skills/${node}`, { level: 5, experience: '4-7y' });
+    await call(app, ana, 'PUT', `/api/me/skills/${node}`, { level: 4, experience: '4-7y' });
+    expect((await d.mine(ana)).find((m) => m.skillId === node)).toMatchObject({ level: 4, validated: true });
+    expect((await d.approvals(dana)).skillClaims.some((c) => c.skill.id === node)).toBe(false);
+
     await call(app, ana, 'PUT', `/api/me/skills/${node}`, { level: 3, experience: '4-7y' });
     expect((await d.mine(ana)).find((m) => m.skillId === node)).toMatchObject({ level: 3, validated: true });
     expect((await d.approvals(dana)).skillClaims.some((c) => c.skill.id === node)).toBe(false);
@@ -319,6 +325,18 @@ describe('Skill-04 validation', () => {
     expect(fresh.level).toBe(3);
     await call(app, dana, 'POST', `/api/skills/claims/${fresh.userSkillId}/reject`, { version: fresh.version });
     expect((await d.mine(jo)).some((m) => m.skillId === go)).toBe(false);
+  });
+
+  it('decides claims stored before versions existed', async () => {
+    const d = await demo();
+    const dana = await d.as('Dana');
+    await database.db
+      .collection('userSkills')
+      .updateOne({ orgId: d.orgId, userId: d.person('Jo'), skillId: d.skill('Go') }, { $unset: { version: '' } });
+    const claim = (await d.approvals(dana)).skillClaims.find((c) => c.skill.id === d.skill('Go'))!;
+    expect(claim.version).toBe(0);
+    const r = await call(app, dana, 'POST', `/api/skills/claims/${claim.userSkillId}/validate`, { version: 0 });
+    expect(r.statusCode, r.body).toBe(200);
   });
 
   it('claims nobody else can validate go to admins, never to the claimer', async () => {

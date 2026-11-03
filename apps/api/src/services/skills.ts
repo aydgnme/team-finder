@@ -214,15 +214,22 @@ export async function setMySkill(ctx: ServiceContext, skillId: string, level: nu
       )._id;
     } else {
       id = current._id;
-      const raise = current.validated && isRaise(current, next);
-      validated = current.validated && !raise;
+      // Compare with the last validated values: a pending raise taken back to (or below) them needs no
+      // validation any more, while a raise of a validated skill keeps those values to restore on reject.
+      const base = current.validated ? current : current.previous;
+      const raise = !base || isRaise(base, next);
+      validated = !raise;
       await repo.userSkills.updateOne(
         { _id: current._id },
         {
           $set: {
             ...next,
             validated,
-            ...(raise ? { previous: { level: current.level, experience: current.experience } } : {}),
+            previous: !raise
+              ? null
+              : current.validated
+                ? { level: current.level, experience: current.experience }
+                : (current.previous ?? null),
           },
           $inc: { version: 1 },
         },
@@ -314,7 +321,12 @@ export async function decideClaim(
     if (claim!.validated || (claim!.version ?? 0) !== version) {
       fail('CONFLICT_STALE', { resource: 'skill claim', id: userSkillId });
     }
-    const guard = { _id: claim!._id, validated: false, version: claim!.version ?? 0 };
+    // Claims from before Skill-04 carry no version field: match that, or they could never be decided.
+    const guard = {
+      _id: claim!._id,
+      validated: false,
+      ...(claim!.version === undefined ? { version: { $exists: false } } : { version: claim!.version }),
+    };
     const changed =
       outcome === 'validated'
         ? await repo.userSkills.updateOne(
