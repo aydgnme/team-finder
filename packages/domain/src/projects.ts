@@ -42,6 +42,11 @@ const TeamRoles = z
   .max(20)
   .refine((rs) => new Set(rs.map((r) => r.roleId)).size === rs.length, 'Each team role can appear once');
 const TechStack = z.array(Id).max(30);
+/** Project-10: skills the team must hold, each at a minimum level (a gate in matching). */
+export const SkillRequirements = z
+  .array(z.object({ skillId: Id, minLevel: SkillLevel }))
+  .max(30)
+  .refine((rs) => new Set(rs.map((r) => r.skillId)).size === rs.length, 'Each skill can be required once');
 
 const datesValid = (p: { period: 'fixed' | 'ongoing'; startDate: string; deadline: string | null }) =>
   p.period === 'ongoing' ? p.deadline === null : p.deadline !== null && p.deadline > p.startDate;
@@ -57,6 +62,7 @@ export const CreateProjectRequest = z
     status: z.enum(INITIAL_STATUSES).default('notStarted'),
     techStack: TechStack.default([]),
     teamRoles: TeamRoles.default([]),
+    skillRequirements: SkillRequirements.default([]),
   })
   .refine(datesValid, { message: DATES_MESSAGE, path: ['deadline'] });
 export type CreateProjectRequest = z.input<typeof CreateProjectRequest>;
@@ -67,6 +73,7 @@ export const UpdateProjectRequest = z.object({
   description: z.string().trim().max(2000).optional(),
   techStack: TechStack.optional(),
   teamRoles: TeamRoles.optional(),
+  skillRequirements: SkillRequirements.optional(),
   startDate: Day.optional(),
   deadline: Day.nullable().optional(),
 });
@@ -86,6 +93,7 @@ export const ProjectSummary = z.object({
   pm: z.object({ id: Id, name: z.string() }),
   techStack: z.array(Id),
   teamRoles: z.array(z.object({ roleId: Id, count: z.number() })),
+  skillRequirements: z.array(z.object({ skillId: Id, minLevel: z.number() })),
   /** People holding a slot (proposed, active or deallocation proposed) vs total slots. */
   slots: z.object({ filled: z.number(), total: z.number() }),
   canEdit: z.boolean(),
@@ -150,6 +158,26 @@ export const SkillRequest = z.object({
   departmentIds: z.array(Id).max(50).default([]),
 });
 export const SetMySkillRequest = z.object({ level: SkillLevel, experience: Experience });
+
+// ---- skill validation (Skill-04) ----
+
+/** A self-assigned skill (or a raise of one) waiting for the claimer's department manager. */
+export const SkillClaimItem = z.object({
+  userSkillId: Id,
+  version: z.number(),
+  user: z.object({ id: Id, name: z.string() }),
+  skill: z.object({ id: Id, name: z.string() }),
+  level: SkillLevel,
+  experience: Experience,
+  /** The validated values a raise would replace; null for a new claim. */
+  previous: z.object({ level: SkillLevel, experience: Experience }).nullable(),
+});
+export type SkillClaimItem = z.infer<typeof SkillClaimItem>;
+export const SkillClaimDecision = z.object({ version: z.number().int().min(0) });
+export const SkillClaimResult = z.object({
+  userSkillId: Id,
+  outcome: z.enum(['validated', 'rejected']),
+});
 
 /** Hours are bounded by the day, whatever a request says (shared with M3b deallocation). */
 export const MAX_HOURS = HOURS_PER_DAY;
@@ -255,4 +283,8 @@ export const NoApproverItem = z.object({
   user: z.object({ id: z.string(), name: z.string() }),
   project: z.object({ id: z.string(), name: z.string() }),
 });
-export const NoApproverResponse = z.object({ items: z.array(NoApproverItem) });
+export const NoApproverResponse = z.object({
+  items: z.array(NoApproverItem),
+  /** Skill claims only an admin can validate (Skill-04 fallback). */
+  skillClaims: z.array(SkillClaimItem),
+});

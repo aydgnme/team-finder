@@ -42,6 +42,11 @@ export interface PermissionResources {
   'project.create': InOrg;
   /** Edit, change status of, or delete a project: its PM. */
   'project.edit': InOrg & { pmId: string };
+  /**
+   * Validate someone's skill claim (Skill-04): their department manager, never the claimer. A claim
+   * nobody else can validate (`validatorId` null) falls back to admins.
+   */
+  'skill.validate': InOrg & { ownerId: string; validatorId: string | null };
   /** Self-assign skills (Skill-02): only your own. */
   'userSkill.edit': InOrg & { userId: string };
   /** Someone's current and past projects (Project-07): themselves, their manager, admins. */
@@ -70,6 +75,9 @@ const RULES: { [A in Action]: (actor: Actor, resource: PermissionResources[A]) =
   'skill.edit': (actor, s) => s.authorId !== null && s.authorId === actor.userId,
   'project.create': (actor) => has(actor, 'projectManager'),
   'project.edit': (actor, p) => has(actor, 'projectManager') && p.pmId === actor.userId,
+  'skill.validate': (actor, c) =>
+    c.ownerId !== actor.userId &&
+    (c.validatorId === null ? has(actor, 'admin') : c.validatorId === actor.userId && has(actor, 'deptManager')),
   'userSkill.edit': (actor, u) => u.userId === actor.userId,
   'person.viewProjects': (actor, p) =>
     p.userId === actor.userId || has(actor, 'admin') || (p.managerId !== null && p.managerId === actor.userId),

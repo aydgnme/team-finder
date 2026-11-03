@@ -3,7 +3,7 @@ import { AssignmentStatus, CapacityTimeline } from './capacity.ts';
 import { HOURS_PER_DAY } from './constants.ts';
 import { Day } from './dates.ts';
 import { Availability, ExclusionReason, Reason, ROLLING_OFF_WEEKS, ScoreTerms } from './matching.ts';
-import { ProjectStatus } from './projects.ts';
+import { ProjectStatus, SkillClaimItem } from './projects.ts';
 import { Verdict } from './scenarios.ts';
 import { AccessRole } from './permissions.ts';
 
@@ -175,7 +175,11 @@ export const ApprovalItem = z.object({
 });
 export type ApprovalItem = z.infer<typeof ApprovalItem>;
 
-export const ApprovalsResponse = z.object({ items: z.array(ApprovalItem) });
+export const ApprovalsResponse = z.object({
+  items: z.array(ApprovalItem),
+  /** Skill-04: skill claims waiting for the caller's validation. */
+  skillClaims: z.array(SkillClaimItem),
+});
 export type ApprovalsResponse = z.infer<typeof ApprovalsResponse>;
 
 /** One person a draft adds to the team. */
