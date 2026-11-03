@@ -1,0 +1,14 @@
+packages:
+  - packages/*
+  - apps/*
+minimumReleaseAgeExclude:
+  - '@tanstack/query-core@5.105.3'
+  - '@tanstack/react-query@5.105.3'
+  - '@vitest/mocker@5.1.0'
+  - '@vitest/spy@5.1.0'
+  - fastify@5.12.8
+  - vitest@5.1.0
+
+# mongodb-memory-server downloads mongod lazily on first test run; its postinstall is not needed.
+allowBuilds:
+  mongodb-memory-server: false

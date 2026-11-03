@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output and caches
+dist/
+*.tsbuildinfo
+.eslintcache
+.cache/
+vite.config.*.timestamp-*
+
+# Environment (keep the committed templates)
+.env
+.env.*
+!.env.example
+
+# Tests
+coverage/
+playwright-report/
+blob-report/
+test-results/
+playwright/.cache/
+
+# Hosting CLIs
+.vercel/
+.render/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Editors and OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local Claude Code settings (shared settings.json stays committable)
+.claude/settings.local.json
