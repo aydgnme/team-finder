@@ -1,4 +1,5 @@
-import { argon2, randomBytes, timingSafeEqual, type Argon2Parameters } from 'node:crypto';
+import * as crypto from 'node:crypto';
+import { randomBytes, timingSafeEqual, type Argon2Parameters } from 'node:crypto';
 
 // Password hashing with argon2id from node:crypto (Node 24.7+; the repo pins 26), so there is no
 // native dependency to build. Parameters follow the OWASP recommendation (m = 19 MiB, t = 2, p = 1).
@@ -11,9 +12,16 @@ function derive(
   nonce: Buffer,
   p: { memory: number; passes: number; parallelism: number; tagLength: number },
 ) {
+  // A named import would crash the whole API at load time on an older Node; fail here instead,
+  // with the reason, and only for the routes that need a password.
+  if (typeof crypto.argon2 !== 'function') {
+    return Promise.reject(
+      new Error('Password hashing needs Node.js 24.7+ (crypto.argon2); the repo pins Node 26 (.nvmrc).'),
+    );
+  }
   return new Promise<Buffer>((resolve, reject) => {
     const options: Argon2Parameters = { message: password, nonce, ...p };
-    argon2('argon2id', options, (error, key) => (error ? reject(error) : resolve(key)));
+    crypto.argon2('argon2id', options, (error, key) => (error ? reject(error) : resolve(key)));
   });
 }
 
