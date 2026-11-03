@@ -37,6 +37,11 @@ export function sessionStore(database: Database) {
       await orgs.insertOne(doc);
     },
 
+    async deleteOrg(orgId: string): Promise<void> {
+      await orgs.deleteOne({ _id: orgId });
+      await sessions.deleteMany({ orgId });
+    },
+
     async getOrg(orgId: string): Promise<OrgDoc | null> {
       return orgs.findOne({ _id: orgId });
     },

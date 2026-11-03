@@ -13,6 +13,7 @@ const app = buildApp({
   secureCookies: config.production,
   trustProxy: config.trustProxy,
   rateLimits: config.rateLimits,
+  demoRoutesEnabled: config.demoRoutesEnabled,
   aiProvider:
     config.ai.provider === 'anthropic'
       ? anthropicProvider({ apiKey: config.ai.apiKey, model: config.ai.model })

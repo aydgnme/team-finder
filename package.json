@@ -10,6 +10,7 @@
     "prepare": "husky",
     "dev": "pnpm --parallel --filter @team-finder/api --filter @team-finder/web dev",
     "dev:local": "node apps/api/scripts/dev-local.ts",
+    "demo:race": "pnpm --filter @team-finder/api demo:race",
     "build": "pnpm --filter @team-finder/web build",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",
