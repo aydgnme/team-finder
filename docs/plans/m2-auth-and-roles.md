@@ -24,3 +24,19 @@ A new org can be created, invite an employee, assign roles, and staff a project,
 
 ## Risks
 Credential handling (argon2id, no password in logs); session fixation (rotation).
+
+## Implementation notes (eng review, 2026-11-03)
+Checked against the merged M1-M1.75 code. Decisions:
+
+1. **Done-when narrowed.** "Staff a project" needs project creation, which is M3 scope (`m3-organization-data.md`). M2 is done when a new org can sign up, invite an employee who joins, assign roles and team roles, with the cross-org suite green; staffing stays exercised on the demo org until M3 adds projects.
+2. **Hashing without a dependency.** `node:crypto` `argon2('argon2id')` (Node 24.7+, the repo pins 26): OWASP parameters m = 19 MiB, t = 2, p = 1, 16-byte salt, 32-byte tag, stored as a PHC string (`$argon2id$v=19$m=19456,t=2,p=1$salt$hash`) so parameters can be raised later; compared with `timingSafeEqual`. Unknown emails still pay for one verify (no timing oracle). Passwords: 10-200 characters, never logged.
+3. **Identity.** Emails are trimmed and lower-cased, unique across all password users (partial unique index on `users.email` where `passwordHash` exists; demo users have no password and can never log in). The pre-auth lookup lives in `db/` next to sessions, outside `orgRepo`, like the session store.
+4. **Error messages.** Login failures are one generic `INVALID_CREDENTIALS` (401). Sign-up and join say `EMAIL_TAKEN` (409): without email verification (out of scope) hiding it would only hurt real users; the auth rate limits bound enumeration.
+5. **Sessions.** Real-org sessions last 7 days. Sign-up, join and login always issue a new session id and delete the one the browser held (fixation); logout deletes the session and clears the cookie. Roles are re-read on every request, so a role change applies on the next call.
+6. **Rate limits.** Auth routes: 10 per minute per IP; login additionally 10 per 15 minutes per email.
+7. **Roles (Role-01).** `employee` is always kept; only admins change roles; the last admin cannot lose `admin` (`LAST_ADMIN`). New permission actions: `org.manage` (admin: invite link, roles, team roles) and `org.view` (anyone in the org: member list, team roles). The rest of the SRS matrix lands with the milestone that adds each feature, so no rule exists without a route and a test.
+8. **Team roles (Role-02).** Names unique per org, case-insensitive (`NAME_TAKEN`); delete refuses a role referenced by a project or an assignment (`IN_USE`).
+9. **Invites (Auth-02/03).** `orgs.inviteToken`: 32 random bytes, base64url; `GET /api/invites/:token` shows the org name; join creates an `employee`. Admins see and regenerate the link (old links stop working at once).
+10. **Demo.** No sign-up wall (premise 2): `/` still lands in a sandbox. The seed gains an Org Admin persona so the new admin screen is reachable from the role switcher. Login and sign-up are linked from the dock.
+11. **Web.** `#/signup`, `#/login`, `#/join/:token` work without a session (no sandbox is created for them); `#/org` is the admin screen (members and roles, invite link, team roles). A real org without projects lands on the org screen (admins) or an empty state that says projects arrive with M3.
+12. **Cross-org suite.** Two real orgs plus a demo org; every route that takes an id is called with the other org's ids (projects, candidates, assignments, approvals, scenarios, snapshots, AI drafts, members, roles, team roles, invites) and must answer 404/403 without changing anything.
