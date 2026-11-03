@@ -76,7 +76,13 @@ The staffing canvas is the one hero surface; everything else uses the same token
 
 **How it works (race page)** — `#/how-it-works`, linked as "How it works" from the demo dock. A short explanation, one primary button ("Run the race", then "Run it again"), then the result: a heading in Plex Mono, "✓ A committed · ✗ B refused (CAPACITY_EXCEEDED) · replays 1"; two swimlanes (labelled with the lane and project) on a shared millisecond axis, each a bar from start to outcome with a mark per event, the committed lane in accent and the refused one in `--conflict`; the barrier is a dashed vertical rule across both lanes. Below it the same events as an ordered text list, which is what screen readers get (the figure is `aria-hidden`). The live region announces "A committed; B was replayed and refused with CAPACITY_EXCEEDED." Errors are inline; a rate limit says "Try again in N s."
 
-**Dock** — persona switcher ("Viewing as"), Canvas / Approvals (with pending count for managers), org name. Coach-marks (max two, dismissible, remembered in localStorage) appear above it.
+**Inbox** — `#/inbox`, "Inbox" in the dock with an unread badge (polled every 30 s, refetched on a persona switch). The heading is the state: "3 unread" or "You are all caught up". One row per notification, newest first: an accent dot and bold text while unread, one sentence ("Pat Reyes proposed Mira Chen for Atlas."), the age in Plex Mono, and a link to where it is acted on (Approvals, the project, Projects, My skills); following the link marks it read. "Mark all read" sits above the list. Below 768px the link drops under the text.
+
+**Skill claims** — "Skills to validate" under the proposals in Approvals (and "Skills only you can validate" for admins on the Organization screen): one row per claim, "Jo Park · Go · level 2 (Knows), 6-12m", a raise shows "level 3 (…) → level 4 (…) (raise)", with Validate (primary) and Reject. My skills marks unvalidated rows with an amber "Pending validation" pill.
+
+**Required skills** — a block in the project form under the tech stack: one row per skill with an "at least N <level>" select and Remove, plus "Add a required skill…". People below a minimum level appear as near misses.
+
+**Dock** — persona switcher ("Viewing as"), Canvas / Projects / Approvals (pending proposals and skill claims for managers) / Inbox (unread) / Organization, org name. Below 768px the links wrap. Coach-marks (max two, dismissible, remembered in localStorage) appear above it.
 
 ## States
 

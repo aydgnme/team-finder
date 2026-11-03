@@ -9,10 +9,10 @@ Implementation plans derived from the reviewed design in [../design.md](../desig
 | M1.5 Staffing decisions | [m1.5-staffing-decisions.md](m1.5-staffing-decisions.md) | merged (#2); GIF pending |
 | M1.75 AI-drafted teams | [m1.75-ai-drafted-teams.md](m1.75-ai-drafted-teams.md) | merged (#3); real-model eval pending a key |
 | M2 Auth and roles | [m2-auth-and-roles.md](m2-auth-and-roles.md) | merged (#4) |
-| M2.5 Concurrency proof and docs | [m2.5-concurrency-proof.md](m2.5-concurrency-proof.md) | in review |
+| M2.5 Concurrency proof and docs | [m2.5-concurrency-proof.md](m2.5-concurrency-proof.md) | merged (#7) |
 | Polish bucket | [polish.md](polish.md) | planned, first to slip |
 | M3 Organization data | [m3-organization-data.md](m3-organization-data.md) | merged (#5, #6) |
-| M4 Skills lifecycle and notifications | [m4-skills-and-notifications.md](m4-skills-and-notifications.md) | planned |
+| M4 Skills lifecycle and notifications | [m4-skills-and-notifications.md](m4-skills-and-notifications.md) | M4a in review; M4b planned |
 | M5 Statistics and seed | [m5-statistics-and-seed.md](m5-statistics-and-seed.md) | planned |
 | M7 Release | [m7-release.md](m7-release.md) | planned |
 
