@@ -225,6 +225,10 @@ kbd {
   .dock-org {
     display: none;
   }
+  .dock-nav {
+    flex-wrap: wrap;
+    gap: 6px 14px;
+  }
   .btn,
   .btn-small {
     min-height: 44px;
@@ -1559,4 +1563,62 @@ kbd {
 .race-text {
   font-size: 13px;
   padding-left: 18px;
+}
+
+/* ---- M4a: inbox and skill claims ---- */
+.table-scroll {
+  position: relative;
+  overflow-x: auto;
+}
+.inbox > .org-section {
+  margin-top: 28px;
+}
+.inbox-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+.notification {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.notification-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.notification.unread .notification-dot {
+  background: var(--accent);
+}
+.notification.unread .notification-text {
+  font-weight: 600;
+}
+.notification-time {
+  display: block;
+  font-weight: 400;
+  font-size: 12px;
+}
+.claim-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.team-role-name .status {
+  margin-left: 8px;
+}
+@media (max-width: 767px) {
+  .notification {
+    grid-template-columns: 10px 1fr;
+  }
+  .notification > a {
+    grid-column: 2;
+  }
 }

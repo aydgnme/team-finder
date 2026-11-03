@@ -46,8 +46,8 @@ function MySkills({ data }: { data: SkillsResponse }) {
   const set = useMutation({
     mutationFn: (v: { skillId: string; level: number; experience: Experience }) =>
       api.setMySkill(v.skillId, v.level, v.experience),
-    onSuccess: (_r, v) => {
-      announce(`${name(v.skillId)} saved.`);
+    onSuccess: (r, v) => {
+      announce(r.validated ? `${name(v.skillId)} saved.` : `${name(v.skillId)} saved; waiting for validation.`);
       refresh();
     },
   });
@@ -64,11 +64,24 @@ function MySkills({ data }: { data: SkillsResponse }) {
   return (
     <section className="org-section" aria-labelledby="my-skills-title">
       <h2 id="my-skills-title">My skills</h2>
-      <p className="muted">They decide which projects you are suggested for.</p>
+      <p className="muted">
+        They decide which projects you are suggested for, once your department manager validates them (a new skill, or a
+        higher level or longer experience).
+      </p>
       <ul className="plain-list" data-testid="my-skills">
         {data.mine.map((m) => (
           <li key={m.skillId} className="team-role" data-testid={`my-skill-${name(m.skillId)}`}>
-            <span className="team-role-name">{name(m.skillId)}</span>
+            <span className="team-role-name">
+              {name(m.skillId)}
+              {!m.validated && (
+                <span
+                  className="status status-starting"
+                  title="Counts for matching once your department manager validates it"
+                >
+                  Pending validation
+                </span>
+              )}
+            </span>
             <select
               aria-label={`Level in ${name(m.skillId)}`}
               value={m.level}

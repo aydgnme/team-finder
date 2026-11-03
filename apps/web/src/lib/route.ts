@@ -14,7 +14,8 @@ export type Route =
   | { name: 'project'; projectId: string }
   | { name: 'person'; userId: string }
   | { name: 'departmentProjects'; departmentId: string }
-  | { name: 'race' };
+  | { name: 'race' }
+  | { name: 'inbox' };
 
 /** Screens that work without a session: they must never create a demo sandbox. */
 export const PUBLIC_ROUTES = new Set<Route['name']>(['snapshot', 'signup', 'login', 'join']);
@@ -22,6 +23,7 @@ export const PUBLIC_ROUTES = new Set<Route['name']>(['snapshot', 'signup', 'logi
 function parse(hash: string): Route {
   if (hash.startsWith('#/approvals')) return { name: 'approvals' };
   if (hash.startsWith('#/how-it-works')) return { name: 'race' };
+  if (hash.startsWith('#/inbox')) return { name: 'inbox' };
   if (hash.startsWith('#/signup')) return { name: 'signup' };
   if (hash.startsWith('#/login')) return { name: 'login' };
   if (hash.startsWith('#/org')) return { name: 'org' };
@@ -62,6 +64,7 @@ export const href = {
   join: (token: string) => `#/join/${encodeURIComponent(token)}`,
   org: () => '#/org',
   race: () => '#/how-it-works',
+  inbox: () => '#/inbox',
   projects: () => '#/projects',
   departments: () => '#/departments',
   skills: () => '#/skills',

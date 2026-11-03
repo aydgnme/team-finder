@@ -5,6 +5,7 @@ import { api, toErrorMessage } from '../lib/api.ts';
 import { useAnnounce } from '../lib/announce.tsx';
 import { href } from '../lib/route.ts';
 import { OrgTabs } from './OrgTabs.tsx';
+import { SkillClaims } from './SkillClaims.tsx';
 
 // Organization screen (Auth-02, Role-01, Role-02). Everyone sees members and team roles; admins
 // also get the invite link, role checkboxes and team-role editing. The server enforces all of it.
@@ -317,21 +318,26 @@ function TeamRoleRow({ role, isAdmin, onChanged }: { role: TeamRoleView; isAdmin
 /** Pending items nobody can decide because the person has no department manager. */
 function NoApproverSection() {
   const items = useQuery({ queryKey: ['no-approver'], queryFn: api.noApprover });
-  if (!items.data || items.data.items.length === 0) return null;
+  if (!items.data || (items.data.items.length === 0 && items.data.skillClaims.length === 0)) return null;
   return (
-    <section className="org-section note" aria-labelledby="no-approver-title" data-testid="no-approver">
-      <h2 id="no-approver-title">Waiting for a manager</h2>
-      <p className="muted">
-        Nobody can decide these: the person is not in a department with a manager. Fix it on the Departments tab.
-      </p>
-      <ul className="plain-list">
-        {items.data.items.map((i) => (
-          <li key={i.assignmentId}>
-            {i.user.name} · {i.kind === 'proposal' ? 'proposed for' : 'ending on'}{' '}
-            <a href={href.project(i.project.id)}>{i.project.name}</a>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <>
+      {items.data.items.length > 0 && (
+        <section className="org-section note" aria-labelledby="no-approver-title" data-testid="no-approver">
+          <h2 id="no-approver-title">Waiting for a manager</h2>
+          <p className="muted">
+            Nobody can decide these: the person is not in a department with a manager. Fix it on the Departments tab.
+          </p>
+          <ul className="plain-list">
+            {items.data.items.map((i) => (
+              <li key={i.assignmentId}>
+                {i.user.name} · {i.kind === 'proposal' ? 'proposed for' : 'ending on'}{' '}
+                <a href={href.project(i.project.id)}>{i.project.name}</a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <SkillClaims claims={items.data.skillClaims} title="Skills only you can validate" />
+    </>
   );
 }

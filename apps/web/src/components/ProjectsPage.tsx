@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   nextStatuses,
+  SKILL_LEVELS,
   type CreateProjectRequest,
   type ProjectStatus,
   type ProjectSummary,
@@ -193,6 +194,9 @@ function ProjectForm({ project, onDone }: { project?: ProjectSummary; onDone: ()
   });
   const [teamRoles, setTeamRoles] = useState<RoleRow[]>(project?.teamRoles ?? []);
   const [techStack, setTechStack] = useState<string[]>(project?.techStack ?? []);
+  const [requirements, setRequirements] = useState<{ skillId: string; minLevel: number }[]>(
+    project?.skillRequirements ?? [],
+  );
   // Started projects keep their start (it records when work began); the deadline still moves, and
   // the server clamps everyone's assignments, refusing dates that would overbook someone.
   const startLocked = Boolean(project && project.startDate <= new Date().toISOString().slice(0, 10));
@@ -206,11 +210,12 @@ function ProjectForm({ project, onDone }: { project?: ProjectSummary; onDone: ()
           description: f.description,
           teamRoles,
           techStack,
+          skillRequirements: requirements,
           ...(startLocked ? {} : { startDate: f.startDate }),
           deadline,
         });
       }
-      const body: CreateProjectRequest = { ...f, deadline, teamRoles, techStack };
+      const body: CreateProjectRequest = { ...f, deadline, teamRoles, techStack, skillRequirements: requirements };
       return api.createProject(body);
     },
     onSuccess: (p) => {
@@ -223,6 +228,8 @@ function ProjectForm({ project, onDone }: { project?: ProjectSummary; onDone: ()
   });
   const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }));
   const unusedRoles = (roles.data?.teamRoles ?? []).filter((r) => !teamRoles.some((t) => t.roleId === r.id));
+  const skillName = (id: string) => skills.data?.skills.find((s) => s.id === id)?.name ?? 'Skill';
+  const unrequired = (skills.data?.skills ?? []).filter((s) => !requirements.some((r) => r.skillId === s.id));
 
   return (
     <form
@@ -354,6 +361,59 @@ function ProjectForm({ project, onDone }: { project?: ProjectSummary; onDone: ()
         </div>
         {skills.data && skills.data.skills.length === 0 && (
           <p className="muted">No skills yet: add them on the Skills screen.</p>
+        )}
+      </fieldset>
+
+      <fieldset className="form-group" data-testid="required-skills">
+        <legend>Required skills</legend>
+        <p className="muted field-hint">
+          People below a minimum level are shown as near misses, not ranked candidates.
+        </p>
+        {requirements.map((r, i) => (
+          <div className="form-row" key={r.skillId}>
+            <span className="team-role-name">{skillName(r.skillId)}</span>
+            <label className="inline-field">
+              <span className="sr-only">Minimum level</span>
+              <select
+                value={r.minLevel}
+                aria-label={`Minimum level in ${skillName(r.skillId)}`}
+                onChange={(e) => {
+                  const minLevel = Number(e.target.value);
+                  setRequirements((rs) => rs.map((x, j) => (j === i ? { ...x, minLevel } : x)));
+                }}
+              >
+                {SKILL_LEVELS.map((l, n) => (
+                  <option key={l} value={n + 1}>
+                    at least {n + 1} {l}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="btn btn-small btn-ghost"
+              onClick={() => setRequirements((rs) => rs.filter((_, j) => j !== i))}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        {unrequired.length > 0 && (
+          <select
+            value=""
+            aria-label="Add a required skill"
+            onChange={(e) => {
+              const skillId = e.target.value;
+              if (skillId) setRequirements((rs) => [...rs, { skillId, minLevel: 3 }]);
+            }}
+          >
+            <option value="">Add a required skill…</option>
+            {unrequired.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         )}
       </fieldset>
 
