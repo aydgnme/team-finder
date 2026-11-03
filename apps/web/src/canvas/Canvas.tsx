@@ -497,7 +497,9 @@ export function Canvas({ projectId, session }: { projectId: string; session: Ses
                 setShareUrl(null);
                 setDraft({ start: r.start, additions });
                 const moved = r.start !== data.project.startDate ? ` Start moved to ${formatDay(r.start)}.` : '';
-                announce(`AI draft: ${additions.length} added to the draft.${moved} Review, then commit.`);
+                // The AI draft replaces the previous one (drafts are client-only); say so rather than lose it silently.
+                const replaced = dirty ? ' It replaced your previous draft.' : '';
+                announce(`AI draft: ${additions.length} added to the draft.${moved}${replaced} Review, then commit.`);
               }}
             />
           )}
