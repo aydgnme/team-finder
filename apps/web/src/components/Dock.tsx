@@ -70,10 +70,13 @@ export function Dock({
             Canvas
           </a>
         )}
+        <a href={href.projects()} aria-current={route.name === 'projects' ? 'page' : undefined}>
+          Projects
+        </a>
         <a href={href.approvals()} aria-current={route.name === 'approvals' ? 'page' : undefined}>
           Approvals{isManager && pending !== undefined ? <span className="badge mono">{pending}</span> : null}
         </a>
-        <a href={href.org()} aria-current={route.name === 'org' ? 'page' : undefined}>
+        <a href={href.org()} aria-current={['org', 'departments', 'skills'].includes(route.name) ? 'page' : undefined}>
           Organization
         </a>
       </nav>

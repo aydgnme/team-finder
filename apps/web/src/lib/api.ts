@@ -1,5 +1,10 @@
 import {
   AiDraftResponse,
+  DepartmentsResponse,
+  ProjectsResponse,
+  ProjectSummary,
+  SkillsResponse,
+  TransitionResponse,
   InviteInfo,
   MembersResponse,
   OrgSettings,
@@ -17,6 +22,10 @@ import {
   SnapshotCreated,
   SnapshotView,
   type AccessRole,
+  type CreateProjectRequest,
+  type Experience,
+  type ProjectStatus,
+  type UpdateProjectRequest,
   type AiSearchRequest,
   type JoinRequest,
   type LoginRequest,
@@ -79,6 +88,9 @@ async function request<S extends z.ZodType>(
   }
   return schema.parse(json);
 }
+
+/** Mutations whose answer the UI only needs to have succeeded. */
+const Ok = z.unknown();
 
 export type CandidateOptions = Pick<
   RankOptions,
@@ -144,6 +156,38 @@ export const api = {
     request(TeamRoleView, `/api/team-roles/${encodeURIComponent(id)}`, { method: 'PATCH', body: { name } }),
   deleteTeamRole: (id: string) =>
     request(z.object({ id: z.string() }), `/api/team-roles/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  projects: () => request(ProjectsResponse, '/api/projects'),
+  createProject: (body: CreateProjectRequest) => request(ProjectSummary, '/api/projects', { method: 'POST', body }),
+  updateProject: (id: string, body: UpdateProjectRequest) =>
+    request(ProjectSummary, `/api/projects/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
+  setProjectStatus: (id: string, status: ProjectStatus) =>
+    request(TransitionResponse, `/api/projects/${encodeURIComponent(id)}/status`, { method: 'POST', body: { status } }),
+  deleteProject: (id: string) => request(Ok, `/api/projects/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  departments: () => request(DepartmentsResponse, '/api/departments'),
+  createDepartment: (name: string) => request(Ok, '/api/departments', { method: 'POST', body: { name } }),
+  renameDepartment: (id: string, name: string) =>
+    request(Ok, `/api/departments/${encodeURIComponent(id)}`, { method: 'PATCH', body: { name } }),
+  deleteDepartment: (id: string) => request(Ok, `/api/departments/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  setManager: (id: string, managerId: string | null) =>
+    request(Ok, `/api/departments/${encodeURIComponent(id)}/manager`, { method: 'PUT', body: { managerId } }),
+  addMember: (id: string, userId: string) =>
+    request(Ok, `/api/departments/${encodeURIComponent(id)}/members`, { method: 'POST', body: { userId } }),
+  removeMember: (id: string, userId: string) =>
+    request(Ok, `/api/departments/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+    }),
+  skills: () => request(SkillsResponse, '/api/skills'),
+  createCategory: (name: string) => request(Ok, '/api/skill-categories', { method: 'POST', body: { name } }),
+  deleteCategory: (id: string) => request(Ok, `/api/skill-categories/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  createSkill: (body: { name: string; description: string; categoryId: string; departmentIds: string[] }) =>
+    request(Ok, '/api/skills', { method: 'POST', body }),
+  updateSkill: (id: string, body: { name: string; description: string; categoryId: string; departmentIds: string[] }) =>
+    request(Ok, `/api/skills/${encodeURIComponent(id)}`, { method: 'PUT', body }),
+  deleteSkill: (id: string) => request(Ok, `/api/skills/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  setMySkill: (skillId: string, level: number, experience: Experience) =>
+    request(Ok, `/api/me/skills/${encodeURIComponent(skillId)}`, { method: 'PUT', body: { level, experience } }),
+  removeMySkill: (skillId: string) =>
+    request(Ok, `/api/me/skills/${encodeURIComponent(skillId)}`, { method: 'DELETE' }),
   aiStatus: () => request(AiStatus, '/api/ai/status'),
   aiSearch: (body: AiSearchRequest) => request(AiDraftResponse, '/api/ai/search', { method: 'POST', body }),
 };
