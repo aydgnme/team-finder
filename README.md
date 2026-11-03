@@ -4,7 +4,7 @@
 
 **A team-first staffing canvas.** Start from the shape of a project team, drag ranked candidates into role slots, and see capacity, skill coverage and conflicts update before you commit. Every ranking explains itself, and approvals stay correct when two managers act at the same moment.
 
-> **Status: early development.** The staffing canvas (M1) and staffing decisions (M1.5) work end to end locally (`pnpm dev:local`); deployment, the live demo link and the walkthrough GIF come next. See the [roadmap](#roadmap).
+> **Status: early development.** The staffing canvas (M1), staffing decisions (M1.5) and AI-drafted teams (M1.75) work end to end locally (`pnpm dev:local`); deployment, the live demo link and the walkthrough GIF come next. See the [roadmap](#roadmap).
 
 **One decision, in numbers:** in the sample company, starting Atlas two weeks later lets the strongest backend developer roll off their current project first. The verdict line says so: *start +2 wk → coverage 83% → 100%, +0 overbooked days* (at the original start the same team would add 14 overbooked days).
 
@@ -18,6 +18,7 @@ Most resource-planning tools start from a people-by-weeks grid and treat skills 
 - **One capacity model, client and server.** A pure `CapacityTimeline` in `packages/domain` drives ranking, the drag preview in the browser, and the server-side invariant, so the UI and the API cannot disagree.
 - **Explainable, deterministic matching.** Candidates are scored on skill fit, past-project similarity and availability, with each term shown in the UI. An LLM can draft a team, but the deterministic engine validates every placement before anything is proposed.
 - **Decisions you can compare and share.** Fork the current team, drag the start date and watch availability and the verdict update live; the same pure `compareScenarios()` runs in the browser and on the server. Committing sends every proposal (and moves the project, if the start changed) in one all-or-nothing transaction; a share link stores a server-rebuilt, read-only snapshot.
+- **AI drafts, the engine decides.** Describe the team in plain words; Claude picks from the engine's shortlist, seen only as `c1, c2…` (no names leave the server), and every pick is re-checked like a manual drop before it can enter the draft. Nothing is proposed until the manager commits. A 20-case eval set scores drafts by the share of picks that pass validation and by skill coverage.
 - **Tenant isolation by construction.** Routes never touch the raw database; a scoped repository injects the organization into every query, and a lint rule enforces it.
 
 The full design, including the review history behind these decisions, is in [docs/design.md](docs/design.md).
@@ -58,6 +59,8 @@ pnpm dev:local
 
 `pnpm dev:local` starts an in-memory MongoDB replica set (transactions need one), the API against it and the web app. Open http://localhost:5173: every visit clones the "Atlas" sample company into its own sandbox and lands on the canvas as the project manager. No accounts or environment variables are needed; the first run downloads a MongoDB binary.
 
+AI drafts are optional: set `LLM_API_KEY` (an Anthropic API key; model `claude-opus-5-5` unless `LLM_MODEL` says otherwise) to enable them, or `LLM_PROVIDER=fake` for the deterministic stand-in. Without either the panel says it is off and everything else works.
+
 To run against your own database instead, copy `apps/api/.env.example` to `apps/api/.env`, set a replica-set `MONGODB_URI` and run `pnpm dev`. Without `MONGODB_URI` the API starts without a database and every route except `/api/health` answers `503 DB_UNAVAILABLE`.
 
 ### Try this
@@ -66,6 +69,7 @@ To run against your own database instead, copy `apps/api/.env.example` to `apps/
 2. Follow the hint to switch to **Dana (Engineering Manager)** and approve Mira: the slot turns active.
 3. Approve Kai: the server re-checks capacity inside the transaction and refuses with the exact date and the most hours that would fit.
 4. **Start over** (bottom right), then follow the first hint: drag the start date two weeks later. Tom moves from "Later" to available as you drag. Add him to the draft: the verdict reads *+0 overbooked days*; drag back to the original start and it reads *+14*. **Share** gives a read-only link; **Move start and send 1 proposal** commits it all in one transaction.
+5. **Start over**, then type *a backend dev, two weeks later* into **Draft with AI**: the draft, the start date and the verdict line fill in from one sentence. Locally this uses the deterministic fake provider when you run `LLM_PROVIDER=fake pnpm dev:local`; with `LLM_API_KEY` set it calls Claude.
 
 ## Scripts
 
@@ -74,6 +78,7 @@ To run against your own database instead, copy `apps/api/.env.example` to `apps/
 | `pnpm dev:local` | In-memory replica set + API + web app; also used by the e2e suite |
 | `pnpm dev` | Start API and web app in watch mode against `MONGODB_URI` |
 | `pnpm test` | Unit and API tests (first run downloads a MongoDB binary; `pnpm test:prepare` fetches it ahead of time) |
+| `pnpm eval:ai` | AI-01 eval set: real model with `LLM_API_KEY` (about 20 small paid requests), or free with `LLM_PROVIDER=fake` |
 | `pnpm e2e` | Playwright tests in Chromium and WebKit against `pnpm dev:local` (`pnpm exec playwright install` once) |
 | `pnpm lint` / `pnpm format:check` / `pnpm typecheck` | Static checks, also enforced in CI |
 | `pnpm build` | Production build of the web app |
@@ -110,6 +115,7 @@ Everything is evaluated over the project window `[max(today, start), deadline)` 
 | `GET /api/projects/:id` | Project, role slots, current team with capacity checks |
 | `GET /api/projects/:id/candidates?start=` | Ranked candidates with score terms, reasons and capacity timelines; `start` ranks as if the project started later (scrubber, up to 6 weeks) |
 | `POST /api/projects/:id/scenarios/commit` | Commit a draft: move the start (with its team) and create every proposal in one transaction, all-or-nothing |
+| `GET /api/ai/status` · `POST /api/ai/search` | Whether AI drafts are enabled; draft a team from a plain-language request (checked picks, never written) |
 | `POST /api/snapshots` · `GET /api/snapshots/:id` | Share a draft as a server-rebuilt, read-only snapshot (demo: public for 30 days) |
 | `POST /api/assignments` | Propose a person for a role slot |
 | `POST /api/assignments/:id/approve` · `/reject` | Decide on a proposal (department manager) |
@@ -122,8 +128,9 @@ Every error uses one envelope, `{ code, message, details, hint }`, for example `
 - [x] **M0** Monorepo, CI, deployment configuration, test harness with transactions
 - [ ] **M1** Staffing canvas: ranking engine, drag and drop, proposals, atomic approvals, demo sandbox (built and tested locally; deploy and GIF pending)
 - [ ] **M1.5** Staffing decisions: draft vs current team, start-date scrubber, verdict line, atomic commit, share snapshots (built and tested locally; deploy and GIF pending)
+- [ ] **M1.75** AI-drafted teams: Claude drafts from the engine's shortlist, the engine validates every pick, eval set (built and tested locally with the fake provider; real-model eval pending an API key)
 - [ ] **M2** Authentication, roles and organization onboarding
-- [ ] **M2.5** AI-drafted teams validated by the engine, live concurrency demo
+- [ ] **M2.5** Live concurrency demo ("Watch the race")
 - [ ] **M3–M5** Departments, skills, project lifecycle, endorsements, notifications, statistics
 - [ ] **M7** Final polish, architecture notes and walkthrough
 
