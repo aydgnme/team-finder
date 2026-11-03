@@ -65,6 +65,18 @@ export async function setRoles(ctx: ServiceContext, database: Database, userId: 
     await authStore(database).touchRoles(repo.orgId, session);
     const user = await repo.users.findOne({ _id: userId }, { session });
     if (!user) fail('NOT_FOUND', { resource: 'user', id: userId });
+    // Approving needs the role, and nobody else approves for their department: dropping it while
+    // they still manage one would strand that department's pending proposals.
+    if (!next.includes('deptManager')) {
+      const managed = await repo.departments.findOne({ managerId: userId }, { session });
+      if (managed) {
+        fail('VALIDATION', {
+          issues: [
+            { path: 'roles', message: `${user!.name} manages ${managed.name}; pick another manager there first` },
+          ],
+        });
+      }
+    }
     await repo.users.updateOne({ _id: userId }, { $set: { accessRoles: next } }, { session });
     const admins = await repo.users.countDocuments({ accessRoles: 'admin' }, { session });
     if (admins === 0) fail('LAST_ADMIN', {});
