@@ -49,6 +49,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Cache mongod binary for MongoMemoryReplSet
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm test:prepare
+      # Playwright's webServer runs `pnpm dev:local` (in-memory replica set + API + web).
       - run: pnpm e2e
       - uses: actions/upload-artifact@v4
         if: failure()
