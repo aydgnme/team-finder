@@ -86,6 +86,9 @@ export function Dock({
       </span>
       {session.org.isDemo ? (
         <span className="dock-auth">
+          <a href={href.race()} aria-current={route.name === 'race' ? 'page' : undefined}>
+            How it works
+          </a>
           <a href={href.signup()}>Create your organization</a>
           <a href={href.login()}>Sign in</a>
           <button
