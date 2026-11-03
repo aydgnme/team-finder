@@ -96,6 +96,8 @@ export const INDEXES: DeclaredIndex[] = [
     // At most one open assignment per person and project; backs the in-transaction duplicate check.
     options: { unique: true, partialFilterExpression: { status: { $in: [...NON_TERMINAL_STATUSES] } } },
   },
+  { collection: 'notifications', name: 'org_user_created', key: { orgId: 1, userId: 1, createdAt: -1 } },
+  { collection: 'notifications', name: 'org_user_unread', key: { orgId: 1, userId: 1, readAt: 1 } },
   // Snapshots live outside tenancy (the one exception, see services/snapshots.ts) with their own expiry.
   ttl('snapshots'),
   { collection: 'snapshots', name: 'org_hash', key: { orgId: 1, hash: 1 } },

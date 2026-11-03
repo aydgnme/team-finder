@@ -16,6 +16,7 @@ import type { z } from 'zod';
 import type { AssignmentDoc, ProjectDoc } from '../db/documents.ts';
 import type { DbSession } from '../db/org-repo.ts';
 import type { ServiceContext } from './context.ts';
+import { notify } from './notifications.ts';
 import {
   approvalWindow,
   approverOf,
@@ -80,7 +81,8 @@ export async function insertProposal(
     invalid('from', `must be inside the project window [${window.from}, ${window.to ?? 'open-ended'})`);
   }
 
-  if (!(await approverOf(repo, user, session))) fail('NO_APPROVER', { userId: user._id, slotRoleId });
+  const approverId = await approverOf(repo, user, session);
+  if (!approverId) fail('NO_APPROVER', { userId: user._id, slotRoleId });
 
   const existing = await repo.assignments.findOne(
     { userId: user._id, projectId: project._id, status: { $in: [...NON_TERMINAL_STATUSES] } },
@@ -96,7 +98,7 @@ export async function insertProposal(
   );
   if (taken >= slot!.count) fail('SLOT_FULL', { roleId: slotRoleId, count: slot!.count, slotRoleId });
 
-  return repo.assignments.insertOne(
+  const doc = await repo.assignments.insertOne(
     {
       userId: user._id,
       projectId: project._id,
@@ -114,6 +116,15 @@ export async function insertProposal(
     },
     { session },
   );
+  await notify(ctx, session, [
+    {
+      userId: approverId,
+      type: 'assignmentProposed',
+      refId: doc._id,
+      data: { personName: user.name, projectId: project._id, projectName: project.name },
+    },
+  ]);
+  return doc;
 }
 
 /**
@@ -162,6 +173,34 @@ async function loadDecision(ctx: ServiceContext, assignmentId: string, version: 
   return a;
 }
 
+/** proposalDecided goes to whoever asked: the proposer, or the project's PM for a deallocation. */
+async function notifyDecided(
+  ctx: ServiceContext,
+  session: DbSession,
+  a: AssignmentDoc,
+  decision: 'approved' | 'rejected',
+): Promise<void> {
+  const kind = a.status === 'deallocationProposed' ? 'deallocation' : 'proposal';
+  const [user, project] = await Promise.all([
+    ctx.repo.users.findOne({ _id: a.userId }, { session, projection: { name: 1 } }),
+    ctx.repo.projects.findOne({ _id: a.projectId }, { session, projection: { name: 1, pmId: 1 } }),
+  ]);
+  await notify(ctx, session, [
+    {
+      userId: kind === 'deallocation' ? (project?.pmId ?? null) : a.proposedBy,
+      type: 'proposalDecided',
+      refId: a._id,
+      data: {
+        personName: user?.name ?? 'someone',
+        projectId: a.projectId,
+        projectName: project?.name ?? 'a project',
+        decision,
+        kind,
+      },
+    },
+  ]);
+}
+
 /**
  * deallocationProposed -> past (Project-05): the work ends today (or at its earlier end), the hours
  * are freed, and the person's capacityVersion is bumped like any capacity change.
@@ -177,6 +216,7 @@ async function approveDeallocation(ctx: ServiceContext, a: AssignmentDoc, sessio
   if (updated.matchedCount !== 1) fail('CONFLICT_STALE', { resource: 'proposal', id: a._id });
   await repo.users.updateOne({ _id: a.userId }, { $inc: { capacityVersion: 1 } }, { session });
   await touchProject(repo, a.projectId, session);
+  await notifyDecided(ctx, session, a, 'approved');
   return toAssignmentView({ ...a, status: 'past', to, version: a.version + 1 });
 }
 
@@ -193,6 +233,7 @@ async function rejectDeallocation(ctx: ServiceContext, a: AssignmentDoc, session
   );
   if (updated.matchedCount !== 1) fail('CONFLICT_STALE', { resource: 'proposal', id: a._id });
   await touchProject(repo, a.projectId, session);
+  await notifyDecided(ctx, session, a, 'rejected');
   return toAssignmentView({ ...a, status: 'active', version: a.version + 1 });
 }
 
@@ -217,6 +258,15 @@ export async function proposeDeallocation(ctx: ServiceContext, assignmentId: str
       { session },
     );
     await touchProject(repo, project._id, session);
+    const user = await repo.users.findOne({ _id: a!.userId }, { session });
+    await notify(ctx, session, [
+      {
+        userId: user ? await approverOf(repo, user, session) : null,
+        type: 'deallocationProposed',
+        refId: a!._id,
+        data: { personName: user?.name ?? 'someone', projectId: project._id, projectName: project.name },
+      },
+    ]);
     return toAssignmentView({ ...a!, status: 'deallocationProposed', version: version + 1 });
   });
 }
@@ -280,6 +330,7 @@ export async function approve(
     if (updated.matchedCount !== 1) fail('CONFLICT_STALE', { resource: 'proposal', id: a._id });
     await repo.users.updateOne({ _id: a.userId }, { $inc: { capacityVersion: 1 } }, { session });
     await touchProject(repo, a.projectId, session);
+    await notifyDecided(ctx, session, a, 'approved');
     return toAssignmentView({ ...a, status: 'active', from, to, approverId: actor.userId, version: a.version + 1 });
   });
 }
@@ -297,6 +348,7 @@ export async function reject(ctx: ServiceContext, assignmentId: string, version:
     );
     if (updated.matchedCount !== 1) fail('CONFLICT_STALE', { resource: 'proposal', id: a._id });
     await touchProject(repo, a.projectId, session);
+    await notifyDecided(ctx, session, a, 'rejected');
     return toAssignmentView({ ...a, status: 'rejected', approverId: actor.userId, version: a.version + 1 });
   });
 }

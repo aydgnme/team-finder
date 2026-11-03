@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  ApprovalsResponse,
   CandidatesResponse,
   DepartmentsResponse,
   DomainError,
@@ -377,7 +378,8 @@ describe('skills (Skill-01/02)', () => {
       skillId: k8s,
       level: 3,
       experience: '1-2y',
-      validated: true,
+      // Skill-04 (M4a): a self-assigned skill waits for the department manager.
+      validated: false,
     });
     const dana2 = await as(ana, 'Dana');
     expect(code(await call(app, dana2, 'DELETE', `/api/skills/${k8s}`, {}))).toBe('IN_USE');
@@ -386,7 +388,7 @@ describe('skills (Skill-01/02)', () => {
     ).toBe(200);
   });
 
-  it('lets everyone keep their own skills, which feed the matching engine', async () => {
+  it('lets everyone keep their own skills, which feed the matching engine once validated', async () => {
     const { pat, project, person } = await demo();
     const jo = await sessionFor(pat, person('Jo'));
     const r = await skills(jo);
@@ -397,8 +399,22 @@ describe('skills (Skill-01/02)', () => {
     expect((await skills(jo)).mine.find((m) => m.skillId === aws.id)).toMatchObject({ level: 5, experience: '4-7y' });
 
     const atlas = await project('Atlas');
-    const c = CandidatesResponse.parse((await call(app, jo, 'GET', `/api/projects/${atlas.id}/candidates`)).json());
-    expect(c.candidates.find((x) => x.name === 'Jo Park')!.skills).toContainEqual({ skillId: aws.id, level: 5 });
+    const joSkills = async () =>
+      CandidatesResponse.parse(
+        (await call(app, jo, 'GET', `/api/projects/${atlas.id}/candidates`)).json(),
+      ).candidates.find((x) => x.name === 'Jo Park')!.skills;
+    expect(await joSkills()).not.toContainEqual({ skillId: aws.id, level: 5 });
+
+    // Dana (Jo's department manager) validates the claim; now it counts.
+    const dana = await sessionFor(pat, person('Dana'));
+    const claims = ApprovalsResponse.parse((await call(app, dana, 'GET', '/api/approvals')).json()).skillClaims;
+    const claim = claims.find((c) => c.skill.id === aws.id)!;
+    expect(claim).toMatchObject({ user: { name: 'Jo Park' }, level: 5, experience: '4-7y', previous: null });
+    const ok = await call(app, dana, 'POST', `/api/skills/claims/${claim.userSkillId}/validate`, {
+      version: claim.version,
+    });
+    expect(ok.statusCode, ok.body).toBe(200);
+    expect(await joSkills()).toContainEqual({ skillId: aws.id, level: 5 });
 
     expect((await call(app, jo, 'DELETE', `/api/me/skills/${aws.id}`, {})).statusCode).toBe(200);
     expect((await call(app, jo, 'DELETE', `/api/me/skills/${aws.id}`, {})).statusCode).toBe(404);

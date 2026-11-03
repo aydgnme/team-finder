@@ -1,6 +1,12 @@
 import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { MembersResponse, ProjectBoard, SessionInfo, TeamRolesResponse } from '@team-finder/domain';
+import {
+  MembersResponse,
+  NotificationsResponse,
+  ProjectBoard,
+  SessionInfo,
+  TeamRolesResponse,
+} from '@team-finder/domain';
 import type { FastifyInstance } from 'fastify';
 import { fakeProvider } from '../src/ai/fake.ts';
 import type { Database } from '../src/db/client.ts';
@@ -51,6 +57,9 @@ interface Victim {
   departmentId: string;
   skillId: string;
   categoryId: string;
+  /** A skill claim (Skill-04) and a notification (Notification-01), when the org has one. */
+  claimId: string | null;
+  notificationId: string | null;
 }
 
 async function firstId(collection: string, orgId: string): Promise<string> {
@@ -71,6 +80,8 @@ async function demoVictim(): Promise<{ pm: Visitor; victim: Victim }> {
       departmentId: await firstId('departments', pm.info.org.id),
       skillId: await firstId('skills', pm.info.org.id),
       categoryId: await firstId('skillCategories', pm.info.org.id),
+      claimId: await firstId('userSkills', pm.info.org.id),
+      notificationId: await firstId('notifications', pm.info.org.id),
     },
   };
 }
@@ -104,6 +115,8 @@ async function realVictim(): Promise<{ admin: Visitor; victim: Victim }> {
       departmentId: dept.json().id,
       skillId: skill.json().id,
       categoryId: category.json().id,
+      claimId: null,
+      notificationId: null,
     },
   };
 }
@@ -145,6 +158,12 @@ function attacks(v: Victim): [string, 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE
     ['read project details', 'GET', `/api/projects/${project}/details`],
     ["read someone's projects", 'GET', `/api/people/${v.userId}/projects`],
     ["read a department's projects", 'GET', `/api/departments/${v.departmentId}/projects`],
+    ...(v.claimId
+      ? ([
+          ['validate a skill claim', 'POST', `/api/skills/claims/${v.claimId}/validate`, { version: 0 }],
+          ['reject a skill claim', 'POST', `/api/skills/claims/${v.claimId}/reject`, { version: 0 }],
+        ] as [string, 'POST', string, unknown][])
+      : []),
     ...v.assignmentIds.map((id): [string, 'POST', string, unknown] => [
       `deallocate ${id}`,
       'POST',
@@ -169,6 +188,13 @@ async function expectIsolated(attacker: Visitor, victim: Victim) {
     items?: { assignmentId: string }[];
   };
   expect((approvals.items ?? []).some((i) => victim.assignmentIds.includes(i.assignmentId))).toBe(false);
+  // The inbox is the caller's own: another org's notification ids are ignored, never marked read.
+  const inbox = NotificationsResponse.parse((await call(app, attacker, 'GET', '/api/notifications')).json());
+  expect(inbox.items.some((n) => n.id === victim.notificationId)).toBe(false);
+  if (victim.notificationId) {
+    const r = await call(app, attacker, 'POST', '/api/notifications/read', { ids: [victim.notificationId] });
+    expect(r.json()).toMatchObject({ updated: 0 });
+  }
   expect(await fingerprint(victim.orgId)).toBe(before);
 }
 

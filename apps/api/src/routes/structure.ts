@@ -6,6 +6,7 @@ import {
   MemberRequest,
   SetManagerRequest,
   SetMySkillRequest,
+  SkillClaimDecision,
   SkillRequest,
   TransitionRequest,
   UpdateProjectRequest,
@@ -62,6 +63,22 @@ export function structureRoutes(app: FastifyInstance, deps: RequestDeps, limits:
     views.departmentProjects(contextFor(request, deps), request.params.id, request.query.status),
   );
   app.get('/api/org/no-approver', async (request) => views.noApproverItems(contextFor(request, deps)));
+  app.post<IdParams>('/api/skills/claims/:id/validate', async (request) =>
+    skills.decideClaim(
+      mutating(request),
+      request.params.id,
+      parse(SkillClaimDecision, request.body).version,
+      'validated',
+    ),
+  );
+  app.post<IdParams>('/api/skills/claims/:id/reject', async (request) =>
+    skills.decideClaim(
+      mutating(request),
+      request.params.id,
+      parse(SkillClaimDecision, request.body).version,
+      'rejected',
+    ),
+  );
   app.post<IdParams>('/api/assignments/:id/deallocate', async (request) => {
     const { version, reason } = parse(DeallocateRequest, request.body);
     return proposeDeallocation(mutating(request), request.params.id, version, reason);

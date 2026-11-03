@@ -10,6 +10,7 @@ import {
 import type { AssignmentDoc } from '../db/documents.ts';
 import type { ServiceContext } from './context.ts';
 import { summaries } from './projects.ts';
+import { strandedClaims } from './skills.ts';
 import { approverOf, groupBy, loadProject, unique } from './shared.ts';
 
 // Project-06..09 views and the admin "no approver" list (docs/plans/m3-organization-data.md, M3b).
@@ -148,8 +149,11 @@ export async function departmentProjects(
 export async function noApproverItems(ctx: ServiceContext) {
   const { repo, actor } = ctx;
   if (!can(actor, 'org.manage', { orgId: actor.orgId })) fail('FORBIDDEN', { action: 'view stranded approvals' });
-  const pending = await repo.assignments.find({ status: { $in: ['proposed', 'deallocationProposed'] } });
-  if (pending.length === 0) return { items: [] };
+  const [pending, skillClaims] = await Promise.all([
+    repo.assignments.find({ status: { $in: ['proposed', 'deallocationProposed'] } }),
+    strandedClaims(ctx),
+  ]);
+  if (pending.length === 0) return { items: [], skillClaims };
   const [users, departments, projects] = await Promise.all([
     repo.users.find(
       { _id: { $in: unique(pending.map((a) => a.userId)) } },
@@ -173,5 +177,6 @@ export async function noApproverItems(ctx: ServiceContext) {
         user: { id: a.userId, name: user.get(a.userId)?.name ?? 'Unknown' },
         project: { id: a.projectId, name: projectName.get(a.projectId) ?? 'Project' },
       })),
+    skillClaims,
   };
 }
