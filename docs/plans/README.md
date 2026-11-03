@@ -7,8 +7,8 @@ Implementation plans derived from the reviewed design in [../design.md](../desig
 | M0 Foundations | (done, see git history) | done |
 | M1 Staffing canvas | spec in design.md, built in the M1 cloud session | merged (#1); deploy + GIF pending |
 | M1.5 Staffing decisions | [m1.5-staffing-decisions.md](m1.5-staffing-decisions.md) | merged (#2); GIF pending |
-| M1.75 AI-drafted teams | [m1.75-ai-drafted-teams.md](m1.75-ai-drafted-teams.md) | in review; real-model eval pending a key |
-| M2 Auth and roles | [m2-auth-and-roles.md](m2-auth-and-roles.md) | planned |
+| M1.75 AI-drafted teams | [m1.75-ai-drafted-teams.md](m1.75-ai-drafted-teams.md) | merged (#3); real-model eval pending a key |
+| M2 Auth and roles | [m2-auth-and-roles.md](m2-auth-and-roles.md) | in review |
 | M2.5 Concurrency proof and docs | [m2.5-concurrency-proof.md](m2.5-concurrency-proof.md) | planned |
 | Polish bucket | [polish.md](polish.md) | planned, first to slip |
 | M3 Organization data | [m3-organization-data.md](m3-organization-data.md) | planned |

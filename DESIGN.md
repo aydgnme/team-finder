@@ -64,6 +64,10 @@ The staffing canvas is the one hero surface; everything else uses the same token
 
 **Candidate list (≥ 768px)** — scrolls on its own, sticky beside the slots, so dragging a card never scrolls the target slot out of view.
 
+**Auth screens** — sign-up, sign-in and join share one centered column (400px): brand, title, labelled fields with hints under them, one primary button, an inline alert for errors, and links between the screens and to the demo. No marketing copy.
+
+**Organization screen** — the same topbar as the canvas with the org name as the title; sections in order: the "no projects yet" note (real orgs without projects), Invite people (admins: read-only link field, Copy, Replace link), Members (table: name and email, department, access roles as checkboxes for admins or a comma list otherwise; `employee` is implied and never shown as a box), Team roles (list with "in use", Rename, Delete disabled while in use, and an add field). Role checkboxes are optimistic; a refusal puts the box back with the reason under the row. Below 768px the members table stacks.
+
 **Dock** — persona switcher ("Viewing as"), Canvas / Approvals (with pending count for managers), org name. Coach-marks (max two, dismissible, remembered in localStorage) appear above it.
 
 ## States
@@ -82,6 +86,7 @@ The staffing canvas is the one hero surface; everything else uses the same token
 
 ## Responsive and accessibility
 
+- Dock: demo sessions show the persona switcher, "Create your organization" and "Sign in"; real sessions show the signed-in name and "Sign out". Organization is in the nav for everyone.
 - ≥ 1024px: slots and a 380px sidebar. 768–1023px: 300px sidebar, chips and titles hidden. < 768px: slots stack above the list, drag is disabled, "Add to slot" is the path, tap targets ≥ 44px. (The design doc's bottom sheet was simplified to a stacked list in M1.)
 - One `aria-live="polite"` region announces proposals ("Mira Chen proposed for Backend Developer. Coverage 100%."), approvals, persona switches and every error; a visible toast repeats it.
 - Keyboard path: Tab to "Add to slot", Enter opens the menu (first open slot focused), Enter opens the popover, Enter proposes.
