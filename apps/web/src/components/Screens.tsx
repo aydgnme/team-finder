@@ -75,14 +75,18 @@ export function SetupScreen({ error, onRetry }: { error: string | null; onRetry:
   );
 }
 
-export function SessionEndedModal({ onRestart }: { onRestart: () => void }) {
+export function SessionEndedModal({ isDemo, onRestart }: { isDemo: boolean; onRestart: () => void }) {
   return (
     <div className="modal-backdrop">
       <div className="modal" role="alertdialog" aria-modal="true" aria-labelledby="ended-title">
-        <h2 id="ended-title">Your demo session ended</h2>
-        <p>Demo sandboxes expire after 24 hours. Start a new one to keep exploring.</p>
+        <h2 id="ended-title">{isDemo ? 'Your demo session ended' : 'Your session ended'}</h2>
+        <p>
+          {isDemo
+            ? 'Demo sandboxes expire after 24 hours. Start a new one to keep exploring.'
+            : 'You were signed out (sessions last 7 days). Sign in again to continue.'}
+        </p>
         <button type="button" className="btn btn-primary" onClick={onRestart} autoFocus>
-          Start a new demo
+          {isDemo ? 'Start a new demo' : 'Sign in again'}
         </button>
       </div>
     </div>

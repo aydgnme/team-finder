@@ -4,9 +4,11 @@ import { ApprovalsInbox } from './approvals/ApprovalsInbox.tsx';
 import { Canvas } from './canvas/Canvas.tsx';
 import { Dock } from './components/Dock.tsx';
 import { NotConfiguredScreen, SessionEndedModal, SetupScreen, WakingScreen } from './components/Screens.tsx';
+import { JoinPage, LoginPage, SignUpPage } from './components/AuthPages.tsx';
+import { OrgPage } from './components/OrgPage.tsx';
 import { SnapshotPage } from './components/SnapshotPage.tsx';
 import { api, errorCode, toErrorMessage } from './lib/api.ts';
-import { useRoute } from './lib/route.ts';
+import { href, navigate, useRoute } from './lib/route.ts';
 import { useServerAwake } from './lib/use-server-awake.ts';
 import { setSessionEnded, useSessionEnded } from './lib/session-ended.ts';
 
@@ -20,10 +22,16 @@ export function App() {
   if (server.state.kind === 'notConfigured') return <NotConfiguredScreen />;
   // Shared snapshots need no session: never create a sandbox just to read one.
   if (route.name === 'snapshot') return <SnapshotPage id={route.id} />;
+  if (route.name === 'signup') return <SignUpPage />;
+  if (route.name === 'login') return <LoginPage />;
+  if (route.name === 'join') return <JoinPage token={route.token} />;
   return <DemoApp />;
 }
 
-/** Lands directly on the Atlas canvas: an existing session is reused, otherwise a sandbox is created. */
+/**
+ * The signed-in app. Without a session, `/` still lands in a fresh demo sandbox (no sign-up wall,
+ * design premise 2); a real org's member lands on their org's screen.
+ */
 function DemoApp() {
   const queryClient = useQueryClient();
   const route = useRoute();
@@ -39,6 +47,14 @@ function DemoApp() {
     },
   });
 
+  const signOut = useMutation({
+    mutationFn: api.logout,
+    onSettled: () => {
+      queryClient.removeQueries();
+      setSessionEnded(false);
+      navigate(href.login());
+    },
+  });
   const needsDemo = session.isError && errorCode(session.error) === 'UNAUTHENTICATED';
   const { isIdle, mutate } = startDemo;
   useEffect(() => {
@@ -64,13 +80,23 @@ function DemoApp() {
     <div className="app">
       {route.name === 'approvals' ? (
         <ApprovalsInbox session={info} />
-      ) : projectId ? (
-        <Canvas key={`${projectId}-${info.user.id}`} projectId={projectId} session={info} />
+      ) : route.name === 'org' || !projectId ? (
+        <OrgPage session={info} />
       ) : (
-        <main className="fullscreen">No project to show.</main>
+        <Canvas key={`${projectId}-${info.user.id}`} projectId={projectId} session={info} />
       )}
-      <Dock session={info} onStartOver={() => startDemo.mutate()} startingOver={startDemo.isPending} />
-      {sessionEnded && <SessionEndedModal onRestart={() => startDemo.mutate()} />}
+      <Dock
+        session={info}
+        onStartOver={() => startDemo.mutate()}
+        startingOver={startDemo.isPending}
+        onSignOut={() => signOut.mutate()}
+      />
+      {sessionEnded && (
+        <SessionEndedModal
+          isDemo={info.org.isDemo}
+          onRestart={() => (info.org.isDemo ? startDemo.mutate() : signOut.mutate())}
+        />
+      )}
     </div>
   );
 }

@@ -1,5 +1,10 @@
 import {
   AiDraftResponse,
+  InviteInfo,
+  MembersResponse,
+  OrgSettings,
+  TeamRoleView,
+  TeamRolesResponse,
   AiStatus,
   ApprovalsResponse,
   AssignmentView,
@@ -11,13 +16,17 @@ import {
   SessionInfo,
   SnapshotCreated,
   SnapshotView,
+  type AccessRole,
   type AiSearchRequest,
+  type JoinRequest,
+  type LoginRequest,
+  type SignUpRequest,
   type ProposeRequest,
   type ScenarioCommitRequest,
   type SnapshotRequest,
   type RankOptions,
 } from '@team-finder/domain';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 /** A non-2xx API response, carrying the `{ code, message, details, hint }` envelope. */
 export class ApiError extends Error {
@@ -34,7 +43,7 @@ export class ApiError extends Error {
 async function request<S extends z.ZodType>(
   schema: S,
   path: string,
-  init: { method?: 'GET' | 'POST'; body?: unknown } = {},
+  init: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body?: unknown } = {},
 ): Promise<z.output<S>> {
   const method = init.method ?? 'GET';
   let res: Response;
@@ -43,9 +52,9 @@ async function request<S extends z.ZodType>(
       method,
       credentials: 'same-origin',
       // Every mutation is JSON (the API answers 415 otherwise), even when there is nothing to send.
-      ...(method === 'POST'
-        ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(init.body ?? {}) }
-        : {}),
+      ...(method === 'GET'
+        ? {}
+        : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(init.body ?? {}) }),
     });
   } catch {
     throw new ApiError(
@@ -112,6 +121,30 @@ export const api = {
     }),
   createSnapshot: (body: SnapshotRequest) => request(SnapshotCreated, '/api/snapshots', { method: 'POST', body }),
   snapshot: (id: string) => request(SnapshotView, `/api/snapshots/${encodeURIComponent(id)}`),
+  signUp: (body: SignUpRequest) => request(SessionInfo, '/api/auth/signup', { method: 'POST', body }),
+  login: (body: LoginRequest) => request(SessionInfo, '/api/auth/login', { method: 'POST', body }),
+  logout: () => request(z.object({ ok: z.boolean() }), '/api/auth/logout', { method: 'POST' }),
+  invite: (token: string) => request(InviteInfo, `/api/invites/${encodeURIComponent(token)}`),
+  join: (token: string, body: JoinRequest) =>
+    request(SessionInfo, `/api/invites/${encodeURIComponent(token)}/join`, { method: 'POST', body }),
+  org: () => request(OrgSettings, '/api/org'),
+  regenerateInvite: () => request(OrgSettings, '/api/org/invite', { method: 'POST' }),
+  members: () => request(MembersResponse, '/api/org/members'),
+  setRoles: (userId: string, roles: AccessRole[]) =>
+    request(
+      z.object({ id: z.string(), roles: z.array(z.string()) }),
+      `/api/org/members/${encodeURIComponent(userId)}/roles`,
+      {
+        method: 'PUT',
+        body: { roles },
+      },
+    ),
+  teamRoles: () => request(TeamRolesResponse, '/api/team-roles'),
+  createTeamRole: (name: string) => request(TeamRoleView, '/api/team-roles', { method: 'POST', body: { name } }),
+  renameTeamRole: (id: string, name: string) =>
+    request(TeamRoleView, `/api/team-roles/${encodeURIComponent(id)}`, { method: 'PATCH', body: { name } }),
+  deleteTeamRole: (id: string) =>
+    request(z.object({ id: z.string() }), `/api/team-roles/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   aiStatus: () => request(AiStatus, '/api/ai/status'),
   aiSearch: (body: AiSearchRequest) => request(AiDraftResponse, '/api/ai/search', { method: 'POST', body }),
 };

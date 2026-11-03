@@ -25,10 +25,12 @@ export function Dock({
   session,
   onStartOver,
   startingOver,
+  onSignOut,
 }: {
   session: SessionInfo;
   onStartOver: () => void;
   startingOver: boolean;
+  onSignOut: () => void;
 }) {
   const route = useRoute();
   const step = useCoach();
@@ -45,7 +47,7 @@ export function Dock({
 
   return (
     <footer className="dock">
-      {session.org.isDemo && (
+      {session.org.isDemo && session.personas.length > 0 && (
         <label className="persona">
           <span>Viewing as</span>
           <select
@@ -71,11 +73,29 @@ export function Dock({
         <a href={href.approvals()} aria-current={route.name === 'approvals' ? 'page' : undefined}>
           Approvals{isManager && pending !== undefined ? <span className="badge mono">{pending}</span> : null}
         </a>
+        <a href={href.org()} aria-current={route.name === 'org' ? 'page' : undefined}>
+          Organization
+        </a>
       </nav>
       <span className="dock-org muted">
         {session.org.name}
         {session.org.isDemo ? ' · private demo sandbox' : ''}
       </span>
+      {session.org.isDemo ? (
+        <span className="dock-auth">
+          <a href={href.signup()}>Create your organization</a>
+          <a href={href.login()}>Sign in</a>
+        </span>
+      ) : (
+        <span className="dock-auth">
+          <span className="muted" data-testid="signed-in-as">
+            {session.user.name}
+          </span>
+          <button type="button" className="btn btn-small btn-ghost" onClick={onSignOut}>
+            Sign out
+          </button>
+        </span>
+      )}
       {session.org.isDemo && (
         <button
           type="button"
