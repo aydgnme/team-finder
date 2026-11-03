@@ -25,7 +25,7 @@ test('sign up, invite, join, grant a role, sign out and in again', async ({ page
   await expect(page.getByTestId('projects-title')).toHaveText('Acme Consulting projects');
   await expect(page.getByTestId('no-projects')).toBeVisible();
   await expect(page.getByTestId('signed-in-as')).toHaveText('Mert Admin');
-  await page.getByRole('link', { name: 'Organization' }).click();
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Organization' }).click();
   await expect(page.getByTestId('org-title')).toHaveText('Acme Consulting');
   const link = await page.getByTestId('invite-link').inputValue();
   expect(link).toMatch(/#\/join\/[A-Za-z0-9_-]{43}$/);
@@ -48,7 +48,7 @@ test('sign up, invite, join, grant a role, sign out and in again', async ({ page
   await emma.getByLabel('Password').fill(PASSWORD);
   await emma.getByRole('button', { name: 'Join Acme Consulting' }).click();
   await expect(emma.getByTestId('projects-title')).toHaveText('Acme Consulting projects');
-  await emma.getByRole('link', { name: 'Organization' }).click();
+  await emma.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Organization' }).click();
   await expect(emma.getByTestId('org-title')).toHaveText('Acme Consulting');
   await expect(emma.getByTestId('invite-link')).toHaveCount(0);
   await expect(emma.getByTestId('member-Emma Employee')).toContainText('Employee');
