@@ -111,7 +111,7 @@ describe('projects (Project-01)', () => {
     expect((await call(app, pat, 'POST', '/api/projects', newProject(over))).statusCode).toBe(status);
   });
 
-  it('lets only the PM edit; dates stay put while a team exists; counts never drop below holders', async () => {
+  it('lets only the PM edit; dates clamp the team (M3b); counts never drop below holders', async () => {
     const { pat, project, role } = await demo();
     const atlas = await project('Atlas');
     expect((await call(app, pat, 'PATCH', `/api/projects/${atlas.id}`, { name: 'Atlas Portal' })).json()).toMatchObject(
@@ -123,8 +123,9 @@ describe('projects (Project-01)', () => {
     const pat2 = await as(dana, 'Pat');
 
     const moved = await call(app, pat2, 'PATCH', `/api/projects/${atlas.id}`, { startDate: '2026-03-16' });
-    expect(code(moved)).toBe('VALIDATION');
-    expect(moved.json().message).toContain('nobody is proposed or assigned');
+    // Since M3b the team moves with the project (clamp, detailed in m3b.test.ts).
+    expect(moved.statusCode, moved.body).toBe(200);
+    expect(moved.json()).toMatchObject({ startDate: '2026-03-16' });
 
     const shrink = await call(app, pat2, 'PATCH', `/api/projects/${atlas.id}`, {
       teamRoles: [

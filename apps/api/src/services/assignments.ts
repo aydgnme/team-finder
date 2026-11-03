@@ -6,6 +6,7 @@ import {
   evaluationWindow,
   fail,
   isEmptyInterval,
+  maxDay,
   NON_TERMINAL_STATUSES,
   ProposeRequest,
   type AssignmentStatus,
@@ -140,7 +141,10 @@ const DECIDED_WORD: Partial<Record<AssignmentStatus, string>> = {
   deallocationProposed: 'approved',
 };
 
-/** Loads a proposal and checks the caller is its approver *now* and that the client saw the latest version. */
+/**
+ * Loads a pending decision (a proposal, or a requested deallocation) and checks the caller is the
+ * person's approver *now* and that the client saw the latest version.
+ */
 async function loadDecision(ctx: ServiceContext, assignmentId: string, version: number, session: DbSession) {
   const { repo, actor } = ctx;
   const a = await repo.assignments.findOne({ _id: assignmentId }, { session });
@@ -150,12 +154,71 @@ async function loadDecision(ctx: ServiceContext, assignmentId: string, version: 
   if (!can(actor, 'assignment.decide', { orgId: repo.orgId, approverId })) {
     fail('FORBIDDEN', { action: 'decide on this proposal' });
   }
-  if (a.status !== 'proposed') {
+  if (a.status !== 'proposed' && a.status !== 'deallocationProposed') {
     const status = DECIDED_WORD[a.status];
     fail('CONFLICT_STALE', { resource: 'proposal', id: a._id, ...(status ? { status } : {}) });
   }
   if (a.version !== version) fail('CONFLICT_STALE', { resource: 'proposal', id: a._id });
   return a;
+}
+
+/**
+ * deallocationProposed -> past (Project-05): the work ends today (or at its earlier end), the hours
+ * are freed, and the person's capacityVersion is bumped like any capacity change.
+ */
+async function approveDeallocation(ctx: ServiceContext, a: AssignmentDoc, session: DbSession): Promise<AssignmentView> {
+  const { repo, actor, today, now } = ctx;
+  const to = a.to !== null && a.to < today ? a.to : maxDay(today, a.from);
+  const updated = await repo.assignments.updateOne(
+    { _id: a._id, status: 'deallocationProposed', version: a.version },
+    { $set: { status: 'past', to, approverId: actor.userId, decidedAt: now }, $inc: { version: 1 } },
+    { session },
+  );
+  if (updated.matchedCount !== 1) fail('CONFLICT_STALE', { resource: 'proposal', id: a._id });
+  await repo.users.updateOne({ _id: a.userId }, { $inc: { capacityVersion: 1 } }, { session });
+  await touchProject(repo, a.projectId, session);
+  return toAssignmentView({ ...a, status: 'past', to, version: a.version + 1 });
+}
+
+/** deallocationProposed -> active: the manager keeps the person on the project. */
+async function rejectDeallocation(ctx: ServiceContext, a: AssignmentDoc, session: DbSession): Promise<AssignmentView> {
+  const { repo, actor, now } = ctx;
+  const updated = await repo.assignments.updateOne(
+    { _id: a._id, status: 'deallocationProposed', version: a.version },
+    {
+      $set: { status: 'active', deallocationReason: null, approverId: actor.userId, decidedAt: now },
+      $inc: { version: 1 },
+    },
+    { session },
+  );
+  if (updated.matchedCount !== 1) fail('CONFLICT_STALE', { resource: 'proposal', id: a._id });
+  await touchProject(repo, a.projectId, session);
+  return toAssignmentView({ ...a, status: 'active', version: a.version + 1 });
+}
+
+/**
+ * active -> deallocationProposed (Project-04): the project's PM asks to end someone's work, with a
+ * reason. Hours stay booked until the department manager agrees.
+ */
+export async function proposeDeallocation(ctx: ServiceContext, assignmentId: string, version: number, reason: string) {
+  const { repo, actor } = ctx;
+  return repo.withTransaction(async (session) => {
+    const a = await repo.assignments.findOne({ _id: assignmentId }, { session });
+    if (!a) fail('NOT_FOUND', { resource: 'assignment', id: assignmentId });
+    const project = await loadProject(repo, a!.projectId, session);
+    if (!can(actor, 'project.staff', { orgId: project.orgId, pmId: project.pmId })) {
+      fail('FORBIDDEN', { action: 'end assignments on this project' });
+    }
+    if (a!.status !== 'active') invalid('status', 'only active assignments can be ended');
+    if (a!.version !== version) fail('CONFLICT_STALE', { resource: 'assignment', id: a!._id });
+    await repo.assignments.updateOne(
+      { _id: a!._id, status: 'active', version },
+      { $set: { status: 'deallocationProposed', deallocationReason: reason }, $inc: { version: 1 } },
+      { session },
+    );
+    await touchProject(repo, project._id, session);
+    return toAssignmentView({ ...a!, status: 'deallocationProposed', version: version + 1 });
+  });
 }
 
 /**
@@ -169,6 +232,7 @@ export async function approve(ctx: ServiceContext, assignmentId: string, version
   const { repo, actor, today, now } = ctx;
   return repo.withTransaction(async (session) => {
     const a = await loadDecision(ctx, assignmentId, version, session);
+    if (a.status === 'deallocationProposed') return approveDeallocation(ctx, a, session);
     const project = await loadProject(repo, a.projectId, session);
     const to = project.period === 'fixed' ? project.deadline : null;
     const others = await repo.assignments.find(
@@ -210,6 +274,7 @@ export async function reject(ctx: ServiceContext, assignmentId: string, version:
   const { repo, actor, now } = ctx;
   return repo.withTransaction(async (session) => {
     const a = await loadDecision(ctx, assignmentId, version, session);
+    if (a.status === 'deallocationProposed') return rejectDeallocation(ctx, a, session);
     const updated = await repo.assignments.updateOne(
       { _id: a._id, status: 'proposed', version: a.version },
       { $set: { status: 'rejected', approverId: actor.userId, decidedAt: now }, $inc: { version: 1 } },

@@ -196,7 +196,7 @@ describe('approvals', () => {
     expect((await call(app, pm, 'GET', '/api/approvals')).statusCode).toBe(403);
     const dm = await switchTo(app, pm, personaId(pm, 'Dana'));
     const r = ApprovalsResponse.parse((await call(app, dm, 'GET', '/api/approvals')).json());
-    expect(r.items.map((i) => [i.user.name, i.slotRole.name, i.check.fits])).toEqual([
+    expect(r.items.map((i) => [i.user.name, i.slotRole.name, i.check?.fits])).toEqual([
       ['Leo Martin', 'Frontend Developer', true],
       ['Kai Nakamura', 'QA Engineer', false],
     ]);
