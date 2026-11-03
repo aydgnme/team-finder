@@ -1,2 +1,8 @@
+export * from './api.ts';
+export * from './capacity.ts';
 export { HOURS_PER_DAY } from './constants.ts';
+export * from './dates.ts';
+export * from './errors.ts';
 export { HealthResponse } from './health.ts';
+export * from './matching.ts';
+export * from './permissions.ts';
