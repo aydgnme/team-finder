@@ -1,5 +1,6 @@
 import type { IndexSpecification, CreateIndexesOptions } from 'mongodb';
 import type { Database } from './client.ts';
+import { NON_TERMINAL_STATUSES } from '@team-finder/domain';
 import { TENANT_COLLECTIONS } from './documents.ts';
 
 // Mongo has no migrations: indexes are the schema. This declared list is applied idempotently at
@@ -36,6 +37,16 @@ export const INDEXES: DeclaredIndex[] = [
   { collection: 'projects', name: 'org_pm', key: { orgId: 1, pmId: 1 } },
   { collection: 'assignments', name: 'org_user_status_from', key: { orgId: 1, userId: 1, status: 1, from: 1 } },
   { collection: 'assignments', name: 'org_project_status', key: { orgId: 1, projectId: 1, status: 1 } },
+  {
+    collection: 'assignments',
+    name: 'org_project_user_open_unique',
+    key: { orgId: 1, projectId: 1, userId: 1 },
+    // At most one open assignment per person and project; backs the in-transaction duplicate check.
+    options: { unique: true, partialFilterExpression: { status: { $in: [...NON_TERMINAL_STATUSES] } } },
+  },
+  // Snapshots live outside tenancy (the one exception, see services/snapshots.ts) with their own expiry.
+  ttl('snapshots'),
+  { collection: 'snapshots', name: 'org_hash', key: { orgId: 1, hash: 1 } },
 ];
 
 export interface IndexReport {

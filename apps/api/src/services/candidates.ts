@@ -1,10 +1,14 @@
 import {
+  addDays,
   can,
   evaluationWindow,
   fail,
+  inScrubRange,
   NON_TERMINAL_STATUSES,
   projectTargets,
   rankCandidates,
+  SCRUB_WEEKS,
+  shiftProject,
   type CandidateInput,
   type CandidatesResponse,
   type PastProject,
@@ -12,6 +16,7 @@ import {
 } from '@team-finder/domain';
 import type { AssignmentDoc, DepartmentDoc, UserDoc, UserSkillDoc } from '../db/documents.ts';
 import type { ServiceContext } from './context.ts';
+import { invalid } from './assignments.ts';
 import { groupBy, loadProject, overlapFilter, unique } from './shared.ts';
 
 type UserWithDept = Pick<UserDoc, '_id' | 'name' | 'title'> & { department: Pick<DepartmentDoc, 'managerId'>[] };
@@ -25,10 +30,22 @@ export async function listCandidates(
   { repo, actor, today }: ServiceContext,
   projectId: string,
   options: Partial<RankOptions>,
+  start?: string,
 ): Promise<CandidatesResponse> {
-  const project = await loadProject(repo, projectId);
-  if (!can(actor, 'project.view', { orgId: project.orgId })) fail('FORBIDDEN', { action: 'view this project' });
-  const window = evaluationWindow(project, today);
+  const stored = await loadProject(repo, projectId);
+  if (!can(actor, 'project.view', { orgId: stored.orgId })) fail('FORBIDDEN', { action: 'view this project' });
+  if (start !== undefined && !inScrubRange(stored, start, today)) {
+    invalid('start', 'must be within 6 weeks after the start of a project that has not started');
+  }
+  // Rank as if the project started on `start` (the scrubber), keeping its duration.
+  const project = start === undefined ? stored : shiftProject(stored, start);
+  // Timelines cover the unshifted window through the end of the whole scrub range, whatever `start`
+  // is, so the canvas can re-classify availability live while the slider moves and only refetch the
+  // ranked order on release.
+  const loadWindow = {
+    from: evaluationWindow(stored, today).from,
+    to: stored.deadline === null ? null : addDays(stored.deadline, SCRUB_WEEKS * 7),
+  };
   const targets = projectTargets(project);
   const targetIds = new Set(targets.map((t) => t.skillId));
 
@@ -41,7 +58,7 @@ export async function listCandidates(
     repo.assignments.find({
       $or: [
         // Load on other projects that may overlap W (capacity and pending).
-        { projectId: { $ne: project._id }, status: { $in: [...NON_TERMINAL_STATUSES] }, ...overlapFilter(window) },
+        { projectId: { $ne: project._id }, status: { $in: [...NON_TERMINAL_STATUSES] }, ...overlapFilter(loadWindow) },
         // History.
         { projectId: { $ne: project._id }, status: 'past' },
         // Already on this project.

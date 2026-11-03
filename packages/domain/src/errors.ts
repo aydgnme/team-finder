@@ -8,19 +8,39 @@ const envelope = <C extends string, D extends z.ZodType>(code: C, details: D) =>
   z.object({ code: z.literal(code), message: z.string(), details, hint: z.string() });
 
 const none = z.object({}).strict();
+/** Scenario commits name the slot a failure belongs to, so the canvas can mark it. */
+const SlotRoleId = z.string().optional();
 
 export const DomainError = z.discriminatedUnion('code', [
   envelope('VALIDATION', z.object({ issues: z.array(z.object({ path: z.string(), message: z.string() })) })),
   envelope('UNAUTHENTICATED', none),
   envelope('FORBIDDEN', z.object({ action: z.string().optional() })),
-  envelope('NOT_FOUND', z.object({ resource: z.string().optional(), id: z.string().optional() })),
+  envelope(
+    'NOT_FOUND',
+    z.object({ resource: z.string().optional(), id: z.string().optional(), slotRoleId: SlotRoleId }),
+  ),
   envelope('CONFLICT_STALE', z.object({ resource: z.string(), id: z.string(), status: z.string().optional() })),
-  envelope('DUPLICATE_ASSIGNMENT', z.object({ userId: z.string(), projectId: z.string(), assignmentId: z.string() })),
-  envelope('SLOT_FULL', z.object({ roleId: z.string(), count: z.number() })),
-  envelope('NO_APPROVER', z.object({ userId: z.string() })),
+  envelope(
+    'DUPLICATE_ASSIGNMENT',
+    z.object({
+      userId: z.string(),
+      projectId: z.string(),
+      assignmentId: z.string().optional(),
+      slotRoleId: SlotRoleId,
+    }),
+  ),
+  envelope('SLOT_FULL', z.object({ roleId: z.string(), count: z.number(), slotRoleId: SlotRoleId })),
+  envelope('NO_APPROVER', z.object({ userId: z.string(), slotRoleId: SlotRoleId })),
   envelope(
     'CAPACITY_EXCEEDED',
-    z.object({ userId: z.string(), date: z.string(), used: z.number(), requested: z.number(), maxHours: z.number() }),
+    z.object({
+      userId: z.string(),
+      date: z.string(),
+      used: z.number(),
+      requested: z.number(),
+      maxHours: z.number(),
+      slotRoleId: SlotRoleId,
+    }),
   ),
   envelope('UNSUPPORTED_MEDIA_TYPE', z.object({ contentType: z.string().optional() })),
   envelope('DB_UNAVAILABLE', none),

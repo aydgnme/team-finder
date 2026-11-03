@@ -1,10 +1,11 @@
 import {
+  buildTimeline,
   can,
-  CAPACITY_CONSUMING_STATUSES,
   evaluationWindow,
   fail,
   NON_TERMINAL_STATUSES,
   projectTargets,
+  scrubRange,
   type ProjectBoard,
 } from '@team-finder/domain';
 import type { ServiceContext } from './context.ts';
@@ -31,7 +32,8 @@ export async function projectBoard({ repo, actor, today }: ServiceContext, proje
     repo.assignments.find({
       userId: { $in: userIds },
       projectId: { $ne: project._id },
-      status: { $in: [...CAPACITY_CONSUMING_STATUSES] },
+      // Pending load too: the timeline drives the canvas warnings; checkProposal only counts committed hours.
+      status: { $in: [...NON_TERMINAL_STATUSES] },
     }),
   ]);
   const names = new Map(users.map((u) => [u._id, u.name]));
@@ -53,6 +55,7 @@ export async function projectBoard({ repo, actor, today }: ServiceContext, proje
       teamRoles: project.teamRoles,
     },
     window: evaluationWindow(project, today),
+    scrub: scrubRange(project, today),
     skills: skills.map((s) => ({ id: s._id, name: s.name })),
     roles: roles.map((r) => ({ id: r._id, name: r.name })),
     canStaff: can(actor, 'project.staff', { orgId: project.orgId, pmId: project.pmId }),
@@ -75,6 +78,7 @@ export async function projectBoard({ repo, actor, today }: ServiceContext, proje
         version: a.version,
         skills: (skillsByUser.get(a.userId) ?? []).map((s) => ({ skillId: s.skillId, level: s.level })),
         check,
+        timeline: buildTimeline(loadByUser.get(a.userId) ?? []),
       };
     }),
   };
