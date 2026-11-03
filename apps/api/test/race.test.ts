@@ -72,6 +72,22 @@ describe('runRace (invariant 2, shown live)', () => {
     expect(orgId).not.toBe('');
     expect(await leftovers(orgId)).toBe(0);
   });
+
+  it('cleans up a half-built race org', async () => {
+    const real = sessionStore(database);
+    const broken = {
+      ...real,
+      createOrg: async (doc: Parameters<typeof real.createOrg>[0]) => {
+        orgId = doc._id;
+        await real.createOrg(doc);
+        throw new Error('boom after the org was written');
+      },
+    };
+    let orgId = '';
+    await expect(runRace(database, broken, NOW)).rejects.toThrow('boom');
+    expect(orgId).not.toBe('');
+    expect(await leftovers(orgId)).toBe(0);
+  });
 });
 
 describe('POST /api/demo/race', () => {

@@ -49,11 +49,15 @@ export function createBarrier(timeoutMs: number) {
   };
 }
 
-async function buildRaceOrg(database: Database, store: SessionStore, now: Date) {
+function raceOrg(database: Database, now: Date) {
   const orgId = newId();
   const expiresAt = new Date(now.getTime() + 10 * 60_000);
+  return { orgId, expiresAt, repo: orgRepo(database, { orgId, isDemo: true, expiresAt }) };
+}
+
+async function buildRaceOrg(store: SessionStore, now: Date, org: ReturnType<typeof raceOrg>) {
+  const { orgId, expiresAt, repo } = org;
   await store.createOrg({ _id: orgId, name: 'Race', isDemo: true, expiresAt, landingProjectId: null, createdAt: now });
-  const repo = orgRepo(database, { orgId, isDemo: true, expiresAt });
   const today = todayUtc(now);
   const start = addDays(today, 7);
   const deadline = addDays(start, 28);
@@ -134,7 +138,7 @@ async function buildRaceOrg(database: Database, store: SessionStore, now: Date) 
       expiresAt,
     },
   };
-  return { orgId, repo, ctx, lanes };
+  return { ctx, lanes };
 }
 
 /**
@@ -147,12 +151,16 @@ export async function runRace(
   now: Date,
   options: { timeoutMs?: number; onBuilt?: (orgId: string) => void } = {},
 ): Promise<RaceResult> {
-  const race = await buildRaceOrg(database, store, now);
-  options.onBuilt?.(race.orgId);
-  const barrier = createBarrier(options.timeoutMs ?? BARRIER_TIMEOUT_MS);
-  const t0 = performance.now();
-  const at = () => Math.round((performance.now() - t0) * 10) / 10;
+  const org = raceOrg(database, now);
+  options.onBuilt?.(org.orgId);
+  let barrier: ReturnType<typeof createBarrier> | undefined;
   try {
+    // Built inside `try` so a half-built org is deleted too (the TTL index is only a backstop).
+    const race = await buildRaceOrg(store, now, org);
+    barrier = createBarrier(options.timeoutMs ?? BARRIER_TIMEOUT_MS);
+    const gate = barrier;
+    const t0 = performance.now();
+    const at = () => Math.round((performance.now() - t0) * 10) / 10;
     const runs = race.lanes.map(async (l) => {
       const events: RaceLane['events'] = [{ at: at(), kind: 'start' }];
       const log = (kind: RaceEventKind, detail?: string) =>
@@ -168,7 +176,7 @@ export async function runRace(
               return;
             }
             log('read', 'capacity read and checked: fits');
-            await barrier.arrive();
+            await gate.arrive();
             log('released');
           },
         });
@@ -202,7 +210,10 @@ export async function runRace(
         };
       }
     });
-    const [a, b] = await Promise.all(runs);
+    // Settle both lanes before cleanup, so `finally` never deletes under an in-flight transaction.
+    const settled = await Promise.allSettled(runs);
+    for (const s of settled) if (s.status === 'rejected') throw s.reason;
+    const [a, b] = settled.map((s) => (s as PromiseFulfilledResult<Awaited<(typeof runs)[number]>>).value);
     const committed = [a!, b!].filter((l) => l.outcome === 'committed');
     if (committed.length !== 1) {
       fail(committed.length === 2 ? 'INVARIANT_BROKEN' : 'RACE_TIMEOUT', {});
@@ -223,8 +234,8 @@ export async function runRace(
       totalMs: at(),
     };
   } finally {
-    barrier.dispose();
-    for (const c of TENANT_COLLECTIONS) await race.repo[c].deleteMany({});
-    await store.deleteOrg(race.orgId);
+    barrier?.dispose();
+    for (const c of TENANT_COLLECTIONS) await org.repo[c].deleteMany({});
+    await store.deleteOrg(org.orgId);
   }
 }
