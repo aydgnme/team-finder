@@ -3,6 +3,7 @@ import type { DepartmentView, DepartmentsResponse, SessionInfo } from '@team-fin
 import { useState } from 'react';
 import { api, toErrorMessage } from '../lib/api.ts';
 import { useAnnounce } from '../lib/announce.tsx';
+import { href } from '../lib/route.ts';
 import { OrgTabs } from './OrgTabs.tsx';
 
 // Department-01..03 (M3a). Admins create, rename and delete departments and pick managers;
@@ -125,6 +126,11 @@ function DepartmentCard({ dept: d, data }: { dept: DepartmentView; data: Departm
             </button>
           </form>
         )}
+        {d.canManageMembers && rename === null && (
+          <a className="btn btn-small btn-ghost" href={href.departmentProjects(d.id)}>
+            Projects
+          </a>
+        )}
         {data.canManage && rename === null && (
           <span className="team-role-actions">
             <button type="button" className="btn btn-small btn-ghost" onClick={() => setRename(d.name)}>
@@ -169,7 +175,13 @@ function DepartmentCard({ dept: d, data }: { dept: DepartmentView; data: Departm
       <ul className="plain-list">
         {d.members.map((m) => (
           <li key={m.id} className="team-role">
-            <span className="team-role-name">{m.name}</span>
+            {d.canManageMembers ? (
+              <a className="team-role-name" href={href.person(m.id)}>
+                {m.name}
+              </a>
+            ) : (
+              <span className="team-role-name">{m.name}</span>
+            )}
             <span className="muted">{m.title}</span>
             {d.canManageMembers && (
               <span className="team-role-actions">

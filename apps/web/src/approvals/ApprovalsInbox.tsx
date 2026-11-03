@@ -12,7 +12,12 @@ export function ApprovalsInbox({ session }: { session: SessionInfo }) {
   const announce = useAnnounce();
   const isManager = session.user.roles.includes('deptManager');
   const [rowError, setRowError] = useState<Record<string, string>>({});
-  const [decided, setDecided] = useState<{ name: string; projectId: string; projectName: string } | null>(null);
+  const [decided, setDecided] = useState<{
+    name: string;
+    projectId: string;
+    projectName: string;
+    ending: boolean;
+  } | null>(null);
   const approvals = useQuery({ queryKey: ['approvals'], queryFn: api.approvals, enabled: isManager });
 
   useEffect(() => {
@@ -24,11 +29,18 @@ export function ApprovalsInbox({ session }: { session: SessionInfo }) {
       action === 'approve' ? api.approve(item.assignmentId, item.version) : api.reject(item.assignmentId, item.version),
     onSuccess: (_v, { item, action }) => {
       setRowError((e) => Object.fromEntries(Object.entries(e).filter(([id]) => id !== item.assignmentId)));
+      const ending = item.kind === 'deallocation';
       if (action === 'approve') {
-        setDecided({ name: item.user.name, projectId: item.project.id, projectName: item.project.name });
-        announce(`${item.user.name} added to ${item.project.name}.`);
+        setDecided({ name: item.user.name, projectId: item.project.id, projectName: item.project.name, ending });
+        announce(
+          ending
+            ? `${item.user.name} leaves ${item.project.name}.`
+            : `${item.user.name} added to ${item.project.name}.`,
+        );
       } else {
-        announce(`Proposal for ${item.user.name} rejected.`);
+        announce(
+          ending ? `${item.user.name} stays on ${item.project.name}.` : `Proposal for ${item.user.name} rejected.`,
+        );
       }
     },
     onError: (error, { item }) => {
@@ -59,7 +71,7 @@ export function ApprovalsInbox({ session }: { session: SessionInfo }) {
       <main className="inbox">
         {decided && (
           <p className="success" role="status" data-testid="approved-banner">
-            ✓ {decided.name} added to {decided.projectName}.{' '}
+            ✓ {decided.name} {decided.ending ? 'leaves' : 'added to'} {decided.projectName}.{' '}
             <a href={href.canvas(decided.projectId)}>View the {decided.projectName} canvas</a>
           </p>
         )}
@@ -107,13 +119,17 @@ export function ApprovalsInbox({ session }: { session: SessionInfo }) {
                   <tr key={item.assignmentId} data-testid={`approval-${item.user.name}`}>
                     <th scope="row">{item.user.name}</th>
                     <td>
+                      {item.kind === 'deallocation' && <strong className="block">Ends their assignment</strong>}
                       {item.project.name} · {item.slotRole.name}
+                      {item.reason && <span className="muted block">Reason: “{item.reason}”</span>}
                       {item.comment && <span className="muted block">“{item.comment}”</span>}
                     </td>
                     <td className="mono">{item.hoursPerDay}</td>
                     <td className="mono">{formatDay(item.from)}</td>
                     <td>
-                      {item.check.fits ? (
+                      {!item.check ? (
+                        <span className="ok">Frees {item.hoursPerDay} h/day</span>
+                      ) : item.check.fits ? (
                         <span className="ok">✓ Fits</span>
                       ) : (
                         <span className="warn">
@@ -134,7 +150,11 @@ export function ApprovalsInbox({ session }: { session: SessionInfo }) {
                           className="btn btn-primary btn-small"
                           disabled={busy}
                           onClick={() => decide.mutate({ item, action: 'approve' })}
-                          aria-label={`Approve ${item.user.name} for ${item.project.name}`}
+                          aria-label={
+                            item.kind === 'deallocation'
+                              ? `Approve ending ${item.user.name} on ${item.project.name}`
+                              : `Approve ${item.user.name} for ${item.project.name}`
+                          }
                         >
                           Approve
                         </button>
@@ -143,7 +163,11 @@ export function ApprovalsInbox({ session }: { session: SessionInfo }) {
                           className="btn btn-small"
                           disabled={busy}
                           onClick={() => decide.mutate({ item, action: 'reject' })}
-                          aria-label={`Reject ${item.user.name} for ${item.project.name}`}
+                          aria-label={
+                            item.kind === 'deallocation'
+                              ? `Keep ${item.user.name} on ${item.project.name}`
+                              : `Reject ${item.user.name} for ${item.project.name}`
+                          }
                         >
                           Reject
                         </button>

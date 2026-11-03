@@ -101,6 +101,8 @@ export interface AssignmentDoc extends TenantDoc {
   from: string;
   to: string | null;
   comments: string;
+  /** Project-04: the PM's reason for ending it, while a deallocation is proposed. */
+  deallocationReason?: string | null;
   /** Who actually decided (audit), not who is allowed to. */
   approverId: string | null;
   proposedBy: string;

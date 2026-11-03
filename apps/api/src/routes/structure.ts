@@ -1,5 +1,6 @@
 import {
   CategoryRequest,
+  DeallocateRequest,
   CreateProjectRequest,
   DepartmentRequest,
   MemberRequest,
@@ -16,6 +17,8 @@ import { parse } from '../http/validate.ts';
 import * as departments from '../services/departments.ts';
 import * as projects from '../services/projects.ts';
 import * as skills from '../services/skills.ts';
+import * as views from '../services/views.ts';
+import { proposeDeallocation } from '../services/assignments.ts';
 
 type IdParams = { Params: { id: string } };
 type MemberParams = { Params: { id: string; userId: string } };
@@ -47,6 +50,22 @@ export function structureRoutes(app: FastifyInstance, deps: RequestDeps, limits:
   app.delete<IdParams>('/api/projects/:id', async (request) =>
     projects.deleteProject(mutating(request), request.params.id),
   );
+
+  // ---- views (Project-06..09) and deallocation (Project-04) ----
+  app.get<IdParams>('/api/projects/:id/details', async (request) =>
+    views.projectDetails(contextFor(request, deps), request.params.id),
+  );
+  app.get<IdParams>('/api/people/:id/projects', async (request) =>
+    views.personProjects(contextFor(request, deps), request.params.id),
+  );
+  app.get<IdParams & { Querystring: { status?: string } }>('/api/departments/:id/projects', async (request) =>
+    views.departmentProjects(contextFor(request, deps), request.params.id, request.query.status),
+  );
+  app.get('/api/org/no-approver', async (request) => views.noApproverItems(contextFor(request, deps)));
+  app.post<IdParams>('/api/assignments/:id/deallocate', async (request) => {
+    const { version, reason } = parse(DeallocateRequest, request.body);
+    return proposeDeallocation(mutating(request), request.params.id, version, reason);
+  });
 
   // ---- departments (Department-01..03) ----
   app.get('/api/departments', async (request) => departments.listDepartments(contextFor(request, deps)));

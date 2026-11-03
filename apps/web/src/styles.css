@@ -1445,3 +1445,26 @@ kbd {
     margin-left: auto;
   }
 }
+
+/* ---- views (M3b) ---- */
+.projects-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 8px;
+}
+.inline-filter {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  max-width: 280px;
+}
+.inline-filter select {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+.block {
+  display: block;
+}

@@ -61,7 +61,7 @@ export const CreateProjectRequest = z
   .refine(datesValid, { message: DATES_MESSAGE, path: ['deadline'] });
 export type CreateProjectRequest = z.input<typeof CreateProjectRequest>;
 
-/** Everything optional; dates may only change while nobody is on the team (M3a; clamp in M3b). */
+/** Everything optional; date changes clamp the team's assignments (M3b). */
 export const UpdateProjectRequest = z.object({
   name: Name.optional(),
   description: z.string().trim().max(2000).optional(),
@@ -153,3 +153,106 @@ export const SetMySkillRequest = z.object({ level: SkillLevel, experience: Exper
 
 /** Hours are bounded by the day, whatever a request says (shared with M3b deallocation). */
 export const MAX_HOURS = HOURS_PER_DAY;
+
+// ---- date edits under a team (M3b) ----
+
+export interface DatedProject {
+  startDate: string;
+  deadline: string | null;
+}
+
+/**
+ * Project date edits clamp, never rewrite (design.md): assignment dates record actual
+ * participation, project dates are the schedule. `from` never moves earlier than it was; `to`
+ * follows the deadline only if it equalled the old one, otherwise it keeps a deliberately shorter
+ * end, cut at the new deadline if that comes first.
+ */
+export function clampAssignment(
+  a: { from: string; to: string | null },
+  before: DatedProject,
+  after: DatedProject,
+): { from: string; to: string | null } {
+  const from = a.from > after.startDate ? a.from : after.startDate;
+  let to: string | null;
+  if (a.to === before.deadline) to = after.deadline;
+  else if (a.to === null || after.deadline === null) to = a.to ?? after.deadline;
+  else to = a.to < after.deadline ? a.to : after.deadline;
+  return { from, to };
+}
+
+export const DateEditConflict = z.object({
+  userId: z.string(),
+  name: z.string(),
+  reason: z.enum(['overbooked', 'startsAfterDeadline']),
+  /** First overbooked day, for `overbooked`. */
+  date: z.string().nullable(),
+});
+export type DateEditConflict = z.infer<typeof DateEditConflict>;
+
+// ---- deallocation (Project-04/05) ----
+
+export const DeallocateRequest = z.object({
+  version: z.number().int().min(0),
+  reason: z.string().trim().min(3, 'Say why, in a few words').max(500),
+});
+
+// ---- views (Project-06..09) ----
+
+export const TeamMember = z.object({
+  assignmentId: z.string(),
+  version: z.number(),
+  userId: z.string(),
+  name: z.string(),
+  slotRoleId: z.string(),
+  roleName: z.string(),
+  hoursPerDay: z.number(),
+  from: Day,
+  to: Day.nullable(),
+  status: z.enum(['proposed', 'active', 'deallocationProposed', 'past', 'rejected']),
+  deallocationReason: z.string().nullable(),
+});
+export type TeamMember = z.infer<typeof TeamMember>;
+
+export const ProjectDetails = z.object({
+  project: ProjectSummary,
+  techStack: z.array(z.object({ id: z.string(), name: z.string() })),
+  roles: z.array(z.object({ id: z.string(), name: z.string(), count: z.number() })),
+  team: z.object({
+    proposed: z.array(TeamMember),
+    active: z.array(TeamMember),
+    past: z.array(TeamMember),
+  }),
+});
+export type ProjectDetails = z.infer<typeof ProjectDetails>;
+
+export const PersonProject = z.object({
+  projectId: z.string(),
+  projectName: z.string(),
+  projectStatus: ProjectStatus,
+  roleName: z.string(),
+  hoursPerDay: z.number(),
+  from: Day,
+  to: Day.nullable(),
+  status: z.enum(['proposed', 'active', 'deallocationProposed', 'past']),
+});
+export const PersonProjects = z.object({
+  person: z.object({ id: z.string(), name: z.string(), title: z.string(), departmentName: z.string().nullable() }),
+  current: z.array(PersonProject),
+  past: z.array(PersonProject),
+});
+export type PersonProjects = z.infer<typeof PersonProjects>;
+
+export const DepartmentProjects = z.object({
+  department: z.object({ id: z.string(), name: z.string() }),
+  projects: z.array(ProjectSummary.extend({ members: z.array(z.object({ id: z.string(), name: z.string() })) })),
+});
+export type DepartmentProjects = z.infer<typeof DepartmentProjects>;
+
+/** Pending items whose person has no department manager: nobody can decide them (admins fix it). */
+export const NoApproverItem = z.object({
+  assignmentId: z.string(),
+  kind: z.enum(['proposal', 'deallocation']),
+  user: z.object({ id: z.string(), name: z.string() }),
+  project: z.object({ id: z.string(), name: z.string() }),
+});
+export const NoApproverResponse = z.object({ items: z.array(NoApproverItem) });

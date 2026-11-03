@@ -142,6 +142,15 @@ function attacks(v: Victim): [string, 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE
     ['edit a skill', 'PUT', `/api/skills/${v.skillId}`, { name: 'Pwned', categoryId: v.categoryId }],
     ['delete a skill', 'DELETE', `/api/skills/${v.skillId}`, {}],
     ['claim a skill', 'PUT', `/api/me/skills/${v.skillId}`, { level: 5, experience: '7y+' }],
+    ['read project details', 'GET', `/api/projects/${project}/details`],
+    ["read someone's projects", 'GET', `/api/people/${v.userId}/projects`],
+    ["read a department's projects", 'GET', `/api/departments/${v.departmentId}/projects`],
+    ...v.assignmentIds.map((id): [string, 'POST', string, unknown] => [
+      `deallocate ${id}`,
+      'POST',
+      `/api/assignments/${id}/deallocate`,
+      { version: 0, reason: 'Pwned you' },
+    ]),
   ];
 }
 

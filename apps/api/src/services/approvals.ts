@@ -12,7 +12,7 @@ export async function listApprovals({ repo, actor, today }: ServiceContext): Pro
   if (depts.length === 0) return { items: [] };
   const users = await repo.users.find({ departmentId: { $in: depts.map((d) => d._id) } });
   const pending = await repo.assignments.find(
-    { userId: { $in: users.map((u) => u._id) }, status: 'proposed' },
+    { userId: { $in: users.map((u) => u._id) }, status: { $in: ['proposed', 'deallocationProposed'] } },
     { sort: { createdAt: 1, _id: 1 } },
   );
   if (pending.length === 0) return { items: [] };
@@ -32,9 +32,11 @@ export async function listApprovals({ repo, actor, today }: ServiceContext): Pro
     items: pending.flatMap((a) => {
       const project = projectById.get(a.projectId);
       if (!project) return [];
-      const { fits, worst, maxHours } = checkProposal(a, project, loadByUser.get(a.userId) ?? [], today);
+      const isProposal = a.status === 'proposed';
+      const check = isProposal ? checkProposal(a, project, loadByUser.get(a.userId) ?? [], today) : null;
       return [
         {
+          kind: isProposal ? ('proposal' as const) : ('deallocation' as const),
           assignmentId: a._id,
           version: a.version,
           user: { id: a.userId, name: userName.get(a.userId) ?? 'Unknown' },
@@ -44,7 +46,8 @@ export async function listApprovals({ repo, actor, today }: ServiceContext): Pro
           from: a.from,
           to: a.to,
           comment: a.comments,
-          check: { fits, worst, maxHours },
+          reason: a.deallocationReason ?? null,
+          check: check ? { fits: check.fits, worst: check.worst, maxHours: check.maxHours } : null,
         },
       ];
     }),

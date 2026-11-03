@@ -9,6 +9,7 @@ import { DepartmentsPage } from './components/DepartmentsPage.tsx';
 import { OrgPage } from './components/OrgPage.tsx';
 import { ProjectsPage } from './components/ProjectsPage.tsx';
 import { SkillsPage } from './components/SkillsPage.tsx';
+import { DepartmentProjectsPage, PersonPage, ProjectPage } from './components/ViewPages.tsx';
 import { SnapshotPage } from './components/SnapshotPage.tsx';
 import { api, errorCode, toErrorMessage } from './lib/api.ts';
 import { href, navigate, useRoute } from './lib/route.ts';
@@ -89,6 +90,12 @@ function DemoApp() {
         <DepartmentsPage session={info} />
       ) : route.name === 'skills' ? (
         <SkillsPage session={info} />
+      ) : route.name === 'project' ? (
+        <ProjectPage key={route.projectId} projectId={route.projectId} />
+      ) : route.name === 'person' ? (
+        <PersonPage key={route.userId} userId={route.userId} session={info} />
+      ) : route.name === 'departmentProjects' ? (
+        <DepartmentProjectsPage key={route.departmentId} departmentId={route.departmentId} />
       ) : route.name === 'projects' || !projectId ? (
         <ProjectsPage session={info} />
       ) : (

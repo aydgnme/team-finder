@@ -19,7 +19,7 @@ test('a new org sets up a department, skills and a project, then staffs it', asy
   await expect(page.getByTestId('projects-title')).toBeVisible();
 
   // Organization: Iris also runs projects and a department; one team role.
-  await page.getByRole('link', { name: 'Organization' }).click();
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Organization' }).click();
   const iris = page.getByTestId('member-Iris Admin');
   await iris.getByLabel('Project manager').check();
   await expect(page.getByTestId('live-region')).toHaveText('Roles updated for Iris Admin.');
@@ -80,7 +80,7 @@ test('a new org sets up a department, skills and a project, then staffs it', asy
   await other.close();
 
   // Projects: Iris creates Apollo needing one backend developer who knows TypeScript.
-  await page.getByRole('link', { name: 'Projects' }).click();
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Projects' }).click();
   await page.getByRole('button', { name: 'New project' }).click();
   const form = page.getByTestId('project-form');
   await form.getByLabel('Name', { exact: true }).fill('Apollo');
@@ -93,7 +93,7 @@ test('a new org sets up a department, skills and a project, then staffs it', asy
   await expect(apollo).toContainText('0/1 slots');
 
   // Staff it on the canvas, approve as Lena's manager (Iris), and the slot is active.
-  await apollo.getByRole('link', { name: 'Apollo' }).click();
+  await apollo.getByRole('link', { name: 'Staff' }).click();
   await expect(page.getByTestId('goal')).toHaveText('Staff Apollo: 1 slot open, TypeScript not covered');
   await page.getByTestId('candidate-Lena Dev').getByRole('button', { name: 'Add to slot' }).click();
   await page.getByRole('menuitem', { name: 'Backend Developer 1' }).click();
@@ -102,12 +102,12 @@ test('a new org sets up a department, skills and a project, then staffs it', asy
     .getByRole('button', { name: /Propose/ })
     .click();
   await expect(page.getByTestId('slot-Backend Developer-1')).toHaveAttribute('data-state', 'pending');
-  await page.getByRole('link', { name: 'Approvals' }).click();
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Approvals' }).click();
   await page.getByTestId('approval-Lena Dev').getByRole('button', { name: 'Approve Lena Dev for Apollo' }).click();
   await expect(page.getByTestId('approved-banner')).toContainText('Lena Dev added to Apollo.');
 
   // Lifecycle: move it forward; once in progress it can no longer be deleted.
-  await page.getByRole('link', { name: 'Projects' }).click();
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Projects' }).click();
   await expect(apollo).toContainText('1/1 slots');
   await apollo.getByLabel('Move Apollo to').selectOption({ label: 'In progress' });
   await expect(apollo).toContainText('In progress');
@@ -118,7 +118,7 @@ test('demo: closing a project ends started work and frees people', async ({ page
   page.on('dialog', (d) => void d.accept());
   await page.goto('/');
   await expect(page.getByTestId('goal')).toBeVisible();
-  await page.getByRole('link', { name: 'Projects' }).click();
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Projects' }).click();
   const orion = page.getByTestId('project-Orion');
   await orion.getByLabel('Move Orion to').selectOption({ label: 'Closed' });
   await expect(page.getByTestId('live-region')).toHaveText('Orion is now closed. 2 assignments ended, 0 rejected.');
@@ -126,6 +126,6 @@ test('demo: closing a project ends started work and frees people', async ({ page
   await expect(orion.getByRole('button', { name: 'Edit' })).toHaveCount(0);
 
   // Kai's 4 h on Orion are gone: his Atlas proposal no longer conflicts.
-  await page.getByTestId('project-Atlas').getByRole('link', { name: 'Atlas' }).click();
+  await page.getByTestId('project-Atlas').getByRole('link', { name: 'Staff' }).click();
   await expect(page.getByTestId('slot-QA Engineer-1')).toHaveAttribute('data-state', 'pending');
 });

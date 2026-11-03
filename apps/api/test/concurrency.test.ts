@@ -42,7 +42,7 @@ describe('approve under concurrency (invariant 2)', () => {
         (i) => i.user.id === jo.userId,
       );
       expect(items).toHaveLength(2);
-      expect(items.every((i) => i.check.fits)).toBe(true);
+      expect(items.every((i) => i.check?.fits)).toBe(true);
 
       const results = await Promise.all(
         items.map((i) => call(app, dm, 'POST', `/api/assignments/${i.assignmentId}/approve`, { version: i.version })),

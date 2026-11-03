@@ -157,6 +157,8 @@ export type AssignmentView = z.infer<typeof AssignmentView>;
 export const DecisionRequest = z.object({ version: z.number().int().min(0) });
 
 export const ApprovalItem = z.object({
+  /** A proposal to add someone, or a PM's request to end their assignment (Project-05). */
+  kind: z.enum(['proposal', 'deallocation']),
   assignmentId: Id,
   version: z.number(),
   user: z.object({ id: Id, name: z.string() }),
@@ -166,7 +168,10 @@ export const ApprovalItem = z.object({
   from: Day,
   to: Day.nullable(),
   comment: z.string(),
-  check: ProposalCheckView,
+  /** Deallocations: the PM's reason. */
+  reason: z.string().nullable(),
+  /** Proposals only: would approving fit invariant 1 now? */
+  check: ProposalCheckView.nullable(),
 });
 export type ApprovalItem = z.infer<typeof ApprovalItem>;
 

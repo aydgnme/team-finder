@@ -1,6 +1,10 @@
 import {
+  buildTimeline,
   can,
   CAPACITY_CONSUMING_STATUSES,
+  clampAssignment,
+  withProposal,
+  type DateEditConflict,
   fail,
   NON_TERMINAL_STATUSES,
   transitionProject,
@@ -25,7 +29,7 @@ function requireEditor({ actor }: ServiceContext, project: Pick<ProjectDoc, 'org
   if (!can(actor, 'project.edit', { orgId: project.orgId, pmId: project.pmId })) fail('FORBIDDEN', { action });
 }
 
-async function summaries(ctx: ServiceContext, projects: ProjectDoc[]): Promise<ProjectSummary[]> {
+export async function summaries(ctx: ServiceContext, projects: ProjectDoc[]): Promise<ProjectSummary[]> {
   const { repo, actor } = ctx;
   const ids = projects.map((p) => p._id);
   const [pms, open] = await Promise.all([
@@ -109,8 +113,7 @@ async function openAssignments(repo: OrgRepo, projectId: string, session: DbSess
 
 /**
  * Edits by the project's PM. Team-role counts cannot drop below the people holding the role.
- * Dates move only while nobody is on the team: moving them under a team needs the clamp and
- * recheck rule, which ships with M3b.
+ * Date changes clamp the team's assignments and re-check everyone's hours (clampTeam).
  */
 export async function updateProject(
   ctx: ServiceContext,
@@ -128,11 +131,12 @@ export async function updateProject(
     const deadline = input.deadline === undefined ? project.deadline : input.deadline;
     const datesChanged = startDate !== project.startDate || deadline !== project.deadline;
     if (datesChanged) {
-      if (open.length > 0) {
-        invalid('startDate', 'dates can change only while nobody is proposed or assigned to the project');
-      }
       const ok = project.period === 'ongoing' ? deadline === null : deadline !== null && deadline > startDate;
       if (!ok) invalid('deadline', 'a fixed project needs a deadline after its start; an ongoing one has none');
+      if (startDate !== project.startDate && (project.startDate <= ctx.today || startDate < ctx.today)) {
+        invalid('startDate', 'the start can move only before the project starts, and not into the past');
+      }
+      await clampTeam(ctx, project, { startDate, deadline }, open, session);
     }
 
     if (input.teamRoles) {
@@ -163,6 +167,82 @@ export async function updateProject(
     await touchProject(repo, project._id, session);
   });
   return summary(ctx, projectId);
+}
+
+/**
+ * Date edits clamp, never rewrite (design.md): every open assignment goes through clampAssignment().
+ * Booked hours that move are re-checked for invariant 1 against the person's other work, and their
+ * capacityVersion is bumped (a concurrent approval elsewhere conflicts and replays). Anyone who would
+ * be overbooked, or whose work would start on or after the new deadline, fails the whole edit with
+ * one DATE_EDIT_CONFLICT naming all of them.
+ */
+async function clampTeam(
+  ctx: ServiceContext,
+  project: ProjectDoc,
+  next: { startDate: string; deadline: string | null },
+  open: AssignmentDoc[],
+  session: DbSession,
+) {
+  const { repo } = ctx;
+  const moved = open
+    .map((a) => ({ a, dates: clampAssignment(a, project, next) }))
+    .filter(({ a, dates }) => dates.from !== a.from || dates.to !== a.to);
+  if (moved.length === 0) return;
+
+  const consuming = moved.filter(({ a }) => (CAPACITY_CONSUMING_STATUSES as readonly string[]).includes(a.status));
+  const people = unique(moved.map(({ a }) => a.userId));
+  const [users, elsewhere] = await Promise.all([
+    repo.users.find({ _id: { $in: people } }, { projection: { name: 1 }, session }),
+    repo.assignments.find(
+      {
+        userId: { $in: unique(consuming.map(({ a }) => a.userId)) },
+        projectId: { $ne: project._id },
+        status: { $in: [...CAPACITY_CONSUMING_STATUSES] },
+      },
+      { session },
+    ),
+  ]);
+  const name = new Map(users.map((u) => [u._id, u.name]));
+  const load = groupBy(elsewhere, (a) => a.userId);
+  const conflicts: DateEditConflict[] = [];
+  for (const { a, dates } of moved) {
+    if (dates.to !== null && dates.to <= dates.from) {
+      conflicts.push({
+        userId: a.userId,
+        name: name.get(a.userId) ?? 'Someone',
+        reason: 'startsAfterDeadline',
+        date: null,
+      });
+      continue;
+    }
+    if (!(CAPACITY_CONSUMING_STATUSES as readonly string[]).includes(a.status)) continue;
+    const check = withProposal(buildTimeline(load.get(a.userId) ?? []), a.hoursPerDay, dates.from, dates);
+    if (!check.fits) {
+      conflicts.push({
+        userId: a.userId,
+        name: name.get(a.userId) ?? 'Someone',
+        reason: 'overbooked',
+        date: check.worst.date,
+      });
+    }
+  }
+  if (conflicts.length > 0) fail('DATE_EDIT_CONFLICT', { conflicts });
+
+  for (const { a, dates } of moved) {
+    const r = await repo.assignments.updateOne(
+      { _id: a._id, version: a.version },
+      { $set: dates, $inc: { version: 1 } },
+      { session },
+    );
+    if (r.matchedCount !== 1) fail('CONFLICT_STALE', { resource: 'assignment', id: a._id });
+  }
+  if (consuming.length > 0) {
+    await repo.users.updateMany(
+      { _id: { $in: unique(consuming.map(({ a }) => a.userId)) } },
+      { $inc: { capacityVersion: 1 } },
+      { session },
+    );
+  }
 }
 
 /**
