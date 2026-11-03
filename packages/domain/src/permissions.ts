@@ -44,6 +44,10 @@ export interface PermissionResources {
   'project.edit': InOrg & { pmId: string };
   /** Self-assign skills (Skill-02): only your own. */
   'userSkill.edit': InOrg & { userId: string };
+  /** Someone's current and past projects (Project-07): themselves, their manager, admins. */
+  'person.viewProjects': InOrg & { userId: string; managerId: string | null };
+  /** A department's projects (Project-08): its manager and admins. */
+  'department.viewProjects': InOrg & { managerId: string | null };
 }
 export type Action = keyof PermissionResources;
 
@@ -67,6 +71,10 @@ const RULES: { [A in Action]: (actor: Actor, resource: PermissionResources[A]) =
   'project.create': (actor) => has(actor, 'projectManager'),
   'project.edit': (actor, p) => has(actor, 'projectManager') && p.pmId === actor.userId,
   'userSkill.edit': (actor, u) => u.userId === actor.userId,
+  'person.viewProjects': (actor, p) =>
+    p.userId === actor.userId || has(actor, 'admin') || (p.managerId !== null && p.managerId === actor.userId),
+  'department.viewProjects': (actor, d) =>
+    has(actor, 'admin') || (d.managerId !== null && d.managerId === actor.userId),
 };
 
 /** Pure permission check. Cross-org access is always denied, whatever the role. */

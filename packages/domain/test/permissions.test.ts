@@ -62,6 +62,17 @@ describe('can()', () => {
     ['project.edit', admin, { orgId: 'o1', pmId: 'me' }, false],
     ['userSkill.edit', emp, { orgId: 'o1', userId: 'me' }, true],
     ['userSkill.edit', admin, { orgId: 'o1', userId: 'other' }, false],
+    ['person.viewProjects', emp, { orgId: 'o1', userId: 'me', managerId: null }, true],
+    ['person.viewProjects', emp, { orgId: 'o1', userId: 'other', managerId: null }, false],
+    ['person.viewProjects', dm, { orgId: 'o1', userId: 'other', managerId: 'me' }, true],
+    ['person.viewProjects', dm, { orgId: 'o1', userId: 'other', managerId: 'someone' }, false],
+    ['person.viewProjects', pm, { orgId: 'o1', userId: 'other', managerId: null }, false],
+    ['person.viewProjects', admin, { orgId: 'o1', userId: 'other', managerId: null }, true],
+    ['person.viewProjects', admin, { orgId: 'o2', userId: 'other', managerId: null }, false],
+    ['department.viewProjects', dm, { orgId: 'o1', managerId: 'me' }, true],
+    ['department.viewProjects', dm, { orgId: 'o1', managerId: 'other' }, false],
+    ['department.viewProjects', admin, { orgId: 'o1', managerId: null }, true],
+    ['department.viewProjects', pm, { orgId: 'o1', managerId: null }, false],
   ] as const)('%s for %o on %o -> %s', (action, who, resource, expected) => {
     expect(can(who, action, resource as never)).toBe(expected);
   });

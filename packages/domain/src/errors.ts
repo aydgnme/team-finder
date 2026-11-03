@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+const DateConflict = z.object({
+  userId: z.string(),
+  name: z.string(),
+  reason: z.enum(['overbooked', 'startsAfterDeadline']),
+  date: z.string().nullable(),
+});
+
 /**
  * One error envelope `{ code, message, details, hint }` for every non-2xx API response
  * (docs/design.md, Phase 3.5 DX #5). `details` is typed per code, so clients can render exact reasons.
@@ -49,6 +56,7 @@ export const DomainError = z.discriminatedUnion('code', [
   envelope('IN_USE', z.object({ resource: z.string() })),
   envelope('TRANSITION_NOT_ALLOWED', z.object({ from: z.string(), to: z.string() })),
   envelope('NOT_DELETABLE', z.object({ reason: z.string() })),
+  envelope('DATE_EDIT_CONFLICT', z.object({ conflicts: z.array(DateConflict).min(1) })),
   envelope('UNSUPPORTED_MEDIA_TYPE', z.object({ contentType: z.string().optional() })),
   envelope('DB_UNAVAILABLE', none),
   envelope('AI_UNAVAILABLE', z.object({ reason: z.string().optional() })),
@@ -76,6 +84,7 @@ export const HTTP_STATUS: Record<ErrorCode, number> = {
   IN_USE: 409,
   TRANSITION_NOT_ALLOWED: 409,
   NOT_DELETABLE: 409,
+  DATE_EDIT_CONFLICT: 409,
   UNSUPPORTED_MEDIA_TYPE: 415,
   RATE_LIMITED: 429,
   INTERNAL: 500,
@@ -152,6 +161,14 @@ const TEXTS: { [C in ErrorCode]: Texts<C> } = {
   NOT_DELETABLE: (d) => ({
     message: `This cannot be deleted: ${d.reason}.`,
     hint: 'Close it instead.',
+  }),
+  DATE_EDIT_CONFLICT: (d) => ({
+    message: `These dates do not work for ${d.conflicts
+      .map((c) =>
+        c.reason === 'overbooked' ? `${c.name} (over 8 h on ${c.date})` : `${c.name} (starts after the new deadline)`,
+      )
+      .join(', ')}.`,
+    hint: 'Pick other dates, or change their assignments first.',
   }),
   UNSUPPORTED_MEDIA_TYPE: () => ({
     message: 'Mutations must be sent as application/json.',

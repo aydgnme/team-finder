@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { CreateProjectRequest, nextStatuses, transitionProject, type ProjectStatus } from '../src/index.ts';
+import {
+  clampAssignment,
+  CreateProjectRequest,
+  nextStatuses,
+  transitionProject,
+  type ProjectStatus,
+} from '../src/index.ts';
 
 describe('transitionProject', () => {
   it.each([
@@ -57,5 +63,58 @@ describe('CreateProjectRequest', () => {
     ],
   ])('%s', (_n, input, ok) => {
     expect(CreateProjectRequest.safeParse(input).success).toBe(ok);
+  });
+});
+
+describe('clampAssignment (date edits clamp, never rewrite)', () => {
+  const before = { startDate: '2026-03-09', deadline: '2026-06-01' };
+  it.each([
+    [
+      'start later: from moves up, full-length end follows',
+      { from: '2026-03-09', to: '2026-06-01' },
+      { startDate: '2026-03-23', deadline: '2026-06-15' },
+      { from: '2026-03-23', to: '2026-06-15' },
+    ],
+    [
+      'a late joiner keeps their own start',
+      { from: '2026-04-01', to: '2026-06-01' },
+      { startDate: '2026-03-23', deadline: '2026-06-15' },
+      { from: '2026-04-01', to: '2026-06-15' },
+    ],
+    [
+      'start earlier: nobody is pulled earlier',
+      { from: '2026-03-09', to: '2026-06-01' },
+      { startDate: '2026-03-02', deadline: '2026-06-01' },
+      { from: '2026-03-09', to: '2026-06-01' },
+    ],
+    [
+      'a shorter allocation keeps its end',
+      { from: '2026-03-09', to: '2026-04-15' },
+      { startDate: '2026-03-09', deadline: '2026-07-01' },
+      { from: '2026-03-09', to: '2026-04-15' },
+    ],
+    [
+      'a shorter allocation is cut by an earlier deadline',
+      { from: '2026-03-09', to: '2026-04-15' },
+      { startDate: '2026-03-09', deadline: '2026-04-01' },
+      { from: '2026-03-09', to: '2026-04-01' },
+    ],
+    [
+      'an ongoing assignment stays open-ended',
+      { from: '2026-03-09', to: null },
+      { startDate: '2026-03-09', deadline: null },
+      { from: '2026-03-09', to: null },
+    ],
+  ] as const)('%s', (_n, a, after, expected) => {
+    const b = after.deadline === null ? { startDate: '2026-03-09', deadline: null } : before;
+    expect(clampAssignment(a, b, after)).toEqual(expected);
+  });
+
+  it('can produce an empty window when the work starts after the new deadline (callers refuse it)', () => {
+    const r = clampAssignment({ from: '2026-05-01', to: '2026-06-01' }, before, {
+      startDate: '2026-03-09',
+      deadline: '2026-04-01',
+    });
+    expect(r).toEqual({ from: '2026-05-01', to: '2026-04-01' });
   });
 });
