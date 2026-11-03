@@ -307,6 +307,9 @@ describe('share snapshots', () => {
     const other = await startDemo(app);
     expect((await call(app, other, 'GET', `/api/snapshots/${id}`)).statusCode).toBe(403);
     expect((await call(app, v, 'GET', `/api/snapshots/${id}`)).statusCode).toBe(200);
+    // Same org, but an employee may not see who is allocated where.
+    const ana = await switchTo(app, v, personaId(v, 'Ana'));
+    expect((await call(app, ana, 'GET', `/api/snapshots/${id}`)).statusCode).toBe(403);
 
     // The TTL monitor can lag by a minute: a document past expiresAt must already read as gone.
     await snapshots.updateOne({ _id: id }, { $set: { isDemo: true, expiresAt: new Date(NOW.getTime() - 1000) } });

@@ -78,6 +78,18 @@ To run against your own database instead, copy `apps/api/.env.example` to `apps/
 | `pnpm lint` / `pnpm format:check` / `pnpm typecheck` | Static checks, also enforced in CI |
 | `pnpm build` | Production build of the web app |
 
+### Upgrading
+
+Indexes are the schema: the API creates the declared list in `apps/api/src/db/indexes.ts` on every boot and never drops one. One of them is unique: at most one open (proposed, active or deallocation-proposed) assignment per person and project. On a database that already holds data, find violations before deploying, or the API keeps retrying the index build and stays in `db: down`:
+
+```js
+db.assignments.aggregate([
+  { $match: { status: { $in: ['proposed', 'active', 'deallocationProposed'] } } },
+  { $group: { _id: { orgId: '$orgId', projectId: '$projectId', userId: '$userId' }, n: { $sum: 1 } } },
+  { $match: { n: { $gt: 1 } } },
+]);
+```
+
 ## How the matching works
 
 Everything is evaluated over the project window `[max(today, start), deadline)` (open-ended for ongoing projects), in UTC days, with half-open intervals.

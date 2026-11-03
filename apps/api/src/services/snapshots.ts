@@ -1,35 +1,17 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { can, fail, shiftProject, verdictSentence, type SnapshotRequest, type SnapshotView } from '@team-finder/domain';
 import type { z } from 'zod';
 import type { Database } from '../db/client.ts';
+import { newSnapshotId, snapshotStore, type SnapshotDoc } from '../db/snapshots.ts';
 import type { ResolvedActor } from '../db/sessions.ts';
 import type { ServiceContext } from './context.ts';
 import { rebuildScenarios } from './scenarios.ts';
 
-// Share snapshots (docs/design.md, "E4 Share snapshots"). An immutable, server-rebuilt copy of one
-// draft and its verdict, in a non-tenant collection with its own expiry, so a demo link keeps
-// working after the 24 h sandbox is gone. getSnapshot() is the one read path outside orgRepo.
+// Share snapshots (docs/design.md, "E4 Share snapshots"): an immutable, server-rebuilt copy of one
+// draft and its verdict with its own expiry. getSnapshot() is the one read path outside orgRepo.
 
 export const SNAPSHOT_TTL_DAYS = { demo: 30, real: 90 } as const;
 const DAY_MS = 86_400_000;
-
-type Content = Omit<SnapshotView, 'id' | 'createdAt' | 'expiresAt'>;
-
-export interface SnapshotDoc {
-  _id: string;
-  orgId: string;
-  isDemo: boolean;
-  /** Same draft of the same project version -> same snapshot (double-clicking "Share"). */
-  hash: string;
-  createdAt: Date;
-  expiresAt: Date;
-  content: Content;
-}
-
-const collection = (database: Database) => database.db.collection<SnapshotDoc>('snapshots');
-
-/** 128-bit random id: unguessable, so a demo link is the only way in. */
-export const newSnapshotId = () => randomBytes(16).toString('base64url');
 
 export async function createSnapshot(
   ctx: ServiceContext,
@@ -45,7 +27,8 @@ export async function createSnapshot(
     .update(JSON.stringify([rebuilt.project._id, rebuilt.project.version, input.start, additions]))
     .digest('base64url');
 
-  const existing = await collection(database).findOne({ orgId: actor.orgId, hash, expiresAt: { $gt: now } });
+  const store = snapshotStore(database);
+  const existing = await store.findLive(actor.orgId, hash, now);
   if (existing) return { id: existing._id, expiresAt: existing.expiresAt.toISOString() };
 
   const shifted = shiftProject(rebuilt.project, input.start);
@@ -66,7 +49,7 @@ export async function createSnapshot(
       sentence: verdictSentence(rebuilt.verdict),
     },
   };
-  await collection(database).insertOne(doc);
+  await store.insert(doc);
   return { id: doc._id, expiresAt: doc.expiresAt.toISOString() };
 }
 
@@ -81,7 +64,7 @@ export async function getSnapshot(
   id: string,
   now: Date,
 ): Promise<SnapshotView> {
-  const doc = await collection(database).findOne({ _id: id });
+  const doc = await snapshotStore(database).get(id);
   if (!doc || doc.expiresAt <= now) fail('NOT_FOUND', { resource: 'snapshot' });
   if (!doc.isDemo) {
     if (!actor) fail('UNAUTHENTICATED', {});
