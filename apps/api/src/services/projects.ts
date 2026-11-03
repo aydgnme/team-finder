@@ -167,7 +167,7 @@ export async function updateProject(
 
 /**
  * Closing ends the team in the same transaction: assignments already started become `past` on
- * the close day; ones that have not started, and open proposals, are rejected (never `to < from`).
+ * the close day (or keep their earlier end); ones that have not started, and open proposals, are rejected (never `to < from`).
  * Everyone whose committed hours changed gets capacityVersion bumped, so a concurrent approval for
  * the same person conflicts and replays.
  */
@@ -180,7 +180,9 @@ async function closeTeam(ctx: ServiceContext, project: ProjectDoc, session: DbSe
   for (const a of open) {
     const consuming = (CAPACITY_CONSUMING_STATUSES as readonly string[]).includes(a.status);
     const started = consuming && a.from <= today;
-    const set = started ? { status: 'past' as const, to: today } : { status: 'rejected' as const, decidedAt: now };
+    // Ends today, or when it already ended: closing never extends a record of past work.
+    const to = a.to !== null && a.to < today ? a.to : today;
+    const set = started ? { status: 'past' as const, to } : { status: 'rejected' as const, decidedAt: now };
     await repo.assignments.updateOne(
       { _id: a._id, version: a.version },
       { $set: set, $inc: { version: 1 } },
