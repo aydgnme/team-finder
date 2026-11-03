@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
     "@fastify/cookie": "11.1.5",
     "@team-finder/domain": "workspace:*",
     "fastify": "5.12.8",
