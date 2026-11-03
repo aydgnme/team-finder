@@ -5,8 +5,13 @@ import {
   DomainError,
   HealthResponse,
   ProjectBoard,
+  ScenarioCommitResponse,
   SessionInfo,
+  SnapshotCreated,
+  SnapshotView,
   type ProposeRequest,
+  type ScenarioCommitRequest,
+  type SnapshotRequest,
   type RankOptions,
 } from '@team-finder/domain';
 import type { z } from 'zod';
@@ -75,8 +80,10 @@ export const api = {
   switchPersona: (userId: string) =>
     request(SessionInfo, '/api/demo/sessions/switch', { method: 'POST', body: { userId } }),
   board: (projectId: string) => request(ProjectBoard, `/api/projects/${encodeURIComponent(projectId)}`),
-  candidates: (projectId: string, o: CandidateOptions) => {
+  /** `start`: rank as if the project started then (the scrubber). */
+  candidates: (projectId: string, o: CandidateOptions, start?: string) => {
     const q = new URLSearchParams({
+      ...(start ? { start } : {}),
       includePartial: String(o.includePartial),
       includeUnavailable: String(o.includeUnavailable),
       includeNearMisses: String(o.includeNearMisses),
@@ -95,6 +102,13 @@ export const api = {
   reject: (id: string, version: number) =>
     request(AssignmentView, `/api/assignments/${encodeURIComponent(id)}/reject`, { method: 'POST', body: { version } }),
   approvals: () => request(ApprovalsResponse, '/api/approvals'),
+  commitScenario: (projectId: string, body: ScenarioCommitRequest) =>
+    request(ScenarioCommitResponse, `/api/projects/${encodeURIComponent(projectId)}/scenarios/commit`, {
+      method: 'POST',
+      body,
+    }),
+  createSnapshot: (body: SnapshotRequest) => request(SnapshotCreated, '/api/snapshots', { method: 'POST', body }),
+  snapshot: (id: string) => request(SnapshotView, `/api/snapshots/${encodeURIComponent(id)}`),
 };
 
 /** The one place errors become user-facing text: message plus hint. */

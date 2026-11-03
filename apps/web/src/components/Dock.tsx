@@ -21,7 +21,15 @@ export function useSwitchPersona() {
   });
 }
 
-export function Dock({ session }: { session: SessionInfo }) {
+export function Dock({
+  session,
+  onStartOver,
+  startingOver,
+}: {
+  session: SessionInfo;
+  onStartOver: () => void;
+  startingOver: boolean;
+}) {
   const route = useRoute();
   const step = useCoach();
   const switchPersona = useSwitchPersona();
@@ -68,6 +76,20 @@ export function Dock({ session }: { session: SessionInfo }) {
         {session.org.name}
         {session.org.isDemo ? ' · private demo sandbox' : ''}
       </span>
+      {session.org.isDemo && (
+        <button
+          type="button"
+          className="btn btn-small btn-ghost"
+          disabled={startingOver}
+          title="A fresh copy of the demo: every change you made is discarded"
+          onClick={() => {
+            navigate('#/');
+            onStartOver();
+          }}
+        >
+          {startingOver ? 'Starting over…' : 'Start over'}
+        </button>
+      )}
 
       {step === 'switchToManager' && manager && session.user.id !== manager.id && (
         <div className="coach" role="dialog" aria-label="Next step" data-testid="coach-switch">

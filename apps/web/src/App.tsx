@@ -4,6 +4,7 @@ import { ApprovalsInbox } from './approvals/ApprovalsInbox.tsx';
 import { Canvas } from './canvas/Canvas.tsx';
 import { Dock } from './components/Dock.tsx';
 import { NotConfiguredScreen, SessionEndedModal, SetupScreen, WakingScreen } from './components/Screens.tsx';
+import { SnapshotPage } from './components/SnapshotPage.tsx';
 import { api, errorCode, toErrorMessage } from './lib/api.ts';
 import { useRoute } from './lib/route.ts';
 import { useServerAwake } from './lib/use-server-awake.ts';
@@ -11,11 +12,14 @@ import { setSessionEnded, useSessionEnded } from './lib/session-ended.ts';
 
 export function App() {
   const server = useServerAwake();
+  const route = useRoute();
   if (server.state.kind === 'checking') return <main className="fullscreen" aria-busy="true" />;
   if (server.state.kind === 'waking') {
     return <WakingScreen elapsedMs={server.state.elapsedMs} gaveUp={server.state.gaveUp} onRetry={server.retry} />;
   }
   if (server.state.kind === 'notConfigured') return <NotConfiguredScreen />;
+  // Shared snapshots need no session: never create a sandbox just to read one.
+  if (route.name === 'snapshot') return <SnapshotPage id={route.id} />;
   return <DemoApp />;
 }
 
@@ -65,7 +69,7 @@ function DemoApp() {
       ) : (
         <main className="fullscreen">No project to show.</main>
       )}
-      <Dock session={info} />
+      <Dock session={info} onStartOver={() => startDemo.mutate()} startingOver={startDemo.isPending} />
       {sessionEnded && <SessionEndedModal onRestart={() => startDemo.mutate()} />}
     </div>
   );

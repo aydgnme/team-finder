@@ -65,6 +65,8 @@ export const CandidateCard = forwardRef<HTMLButtonElement, Props>(function Candi
       ref={setNodeRef}
       className={`card${ghost ? ' card-ghost' : ''}${isDragging ? ' card-dragging' : ''}${blocked ? ' card-blocked' : ''}`}
       data-testid={`candidate-${c.name}`}
+      data-flip-key={c.userId}
+      data-availability={c.availability.kind}
       aria-label={`${c.name}, ${c.title}, score ${Math.round(c.score)}, ${availabilityLine(c)}`}
       {...(draggable && canStaff && !blocked ? { ...attributes, ...listeners, tabIndex: -1 } : {})}
     >

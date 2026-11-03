@@ -9,8 +9,14 @@ import {
 } from '@dnd-kit/core';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  classifyAvailability,
   coverage,
+  daysBetween,
   projectTargets,
+  ROLLING_OFF_WEEKS,
+  scenarioWindow,
+  todayUtc,
+  verdictSentence,
   withProposal,
   type BoardAssignment,
   type CandidateView,
@@ -18,13 +24,17 @@ import {
   type ProjectBoard,
   type SessionInfo,
 } from '@team-finder/domain';
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { api, toErrorMessage, type CandidateOptions } from '../lib/api.ts';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { api, ApiError, toErrorMessage, type CandidateOptions } from '../lib/api.ts';
 import { useAnnounce } from '../lib/announce.tsx';
 import { coach } from '../lib/coach.ts';
-import { firstName, formatRange } from '../lib/format.ts';
+import { useFlip } from '../lib/flip.ts';
+import { firstName, formatDay, formatRange } from '../lib/format.ts';
+import { href } from '../lib/route.ts';
 import { CoverageMeter } from './bars.tsx';
 import { CandidateCard, type OpenSlot } from './CandidateCard.tsx';
+import { ControlRow } from './ControlRow.tsx';
+import { draftAssignment, isDirty, shiftedAssignment, verdictFor, DRAFT_ID_PREFIX, type Draft } from './draft.ts';
 import { ProposePopover, type ProposalInput } from './ProposePopover.tsx';
 import { Slot } from './Slot.tsx';
 
@@ -34,6 +44,9 @@ const DEFAULT_OPTIONS: CandidateOptions = {
   includeUnavailable: false,
   includeNearMisses: false,
 };
+
+/** The ranked order is refetched this long after the scrubber stops moving. */
+const SETTLE_MS = 300;
 
 const RELAX: Partial<Record<ExclusionReason, { label: string; patch: Partial<CandidateOptions> }>> = {
   partial: { label: 'include partially available', patch: { includePartial: true } },
@@ -71,29 +84,86 @@ export function Canvas({ projectId, session }: { projectId: string; session: Ses
   const queryClient = useQueryClient();
   const announce = useAnnounce();
   const narrow = useNarrow();
+  const today = useMemo(() => todayUtc(), []);
   const [options, setOptions] = useState(DEFAULT_OPTIONS);
   const [dragging, setDragging] = useState<CandidateView | null>(null);
   const [placing, setPlacing] = useState<Placing | null>(null);
   const [slotError, setSlotError] = useState<{ key: string; message: string } | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const addButtons = useRef(new Map<string, HTMLButtonElement | null>());
+  const listRef = useRef<HTMLElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const board = useQuery({ queryKey: ['board', projectId], queryFn: () => api.board(projectId) });
+  const data = board.data;
+  const baseStart = data?.project.startDate;
+  const start = draft?.start ?? baseStart;
+
+  // The scrubber moves `start` continuously; the ranked order follows once it settles.
+  const [settled, setSettled] = useState(start);
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(start), SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [start]);
+  const rankStart = settled !== undefined && settled !== baseStart ? settled : undefined;
+
   const candidates = useQuery({
-    queryKey: ['candidates', projectId, options],
-    queryFn: () => api.candidates(projectId, options),
+    queryKey: ['candidates', projectId, options, rankStart ?? null],
+    queryFn: () => api.candidates(projectId, options, rankStart),
     placeholderData: keepPreviousData,
   });
 
-  const data = board.data;
   const skillName = useCallback((id: string) => data?.skills.find((s) => s.id === id)?.name ?? 'skill', [data]);
   const roleName = useCallback((id: string) => data?.roles.find((r) => r.id === id)?.name ?? 'Role', [data]);
 
-  const slots = useMemo(() => (data ? buildSlots(data, roleName) : []), [data, roleName]);
+  const dirty = data ? isDirty(data, draft) : false;
+  const evalWindow = useMemo(
+    () => (data && draft && start ? scenarioWindow(data.project, start, today) : data?.window),
+    [data, draft, start, today],
+  );
+  const team = useMemo(() => {
+    if (!data || !evalWindow) return [];
+    const delta = draft ? daysBetween(data.project.startDate, draft.start) : 0;
+    return [
+      ...data.assignments.map((a) => shiftedAssignment(a, delta, evalWindow)),
+      ...(draft?.additions ?? []).map((a) => draftAssignment(a, evalWindow)),
+    ];
+  }, [data, draft, evalWindow]);
+
+  const slots = useMemo(() => (data ? buildSlots(data, team, roleName) : []), [data, team, roleName]);
   const openSlots: OpenSlot[] = slots
     .filter((s) => !s.assignment)
     .map(({ key, roleId, label }) => ({ key, roleId, label }));
-  const cov = useMemo(() => (data ? teamCoverage(data, dragging) : null), [data, dragging]);
+  const cov = useMemo(() => (data ? teamCoverage(data, team, dragging) : null), [data, team, dragging]);
+  const verdict = useMemo(
+    () => (data && dirty && draft ? verdictFor(data, draft, today) : null),
+    [data, dirty, draft, today],
+  );
+  const sentence = verdict ? verdictSentence(verdict) : null;
+
+  // Announce the verdict when it settles, not on every slider step.
+  const lastAnnounced = useRef<string | null>(null);
+  useEffect(() => {
+    if (!sentence || settled !== start || sentence === lastAnnounced.current) return;
+    lastAnnounced.current = sentence;
+    // Screen readers only: the verdict is already the headline, a toast would repeat it.
+    announce(sentence, 'info', { toast: false });
+  }, [sentence, settled, start, announce]);
+
+  // Unsaved drafts are lost on reload by design; say so before it happens.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    addEventListener('beforeunload', warn);
+    return () => removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  const updateDraft = (fn: (d: Draft) => Draft) => {
+    if (!data) return;
+    setShareUrl(null);
+    setDraft((d) => fn(d ?? { start: data.project.startDate, additions: [] }));
+  };
 
   const propose = useMutation({
     mutationFn: ({ candidate, slot, input }: Placing & { input: ProposalInput }) =>
@@ -125,6 +195,7 @@ export function Canvas({ projectId, session }: { projectId: string; session: Ses
           version: 0,
           skills: candidate.skills,
           check: { fits: check.fits, worst: check.worst, maxHours: check.maxHours },
+          timeline: candidate.timeline,
         };
         queryClient.setQueryData<ProjectBoard>(['board', projectId], {
           ...previous,
@@ -136,24 +207,93 @@ export function Canvas({ projectId, session }: { projectId: string; session: Ses
     onError: (error, { slot, candidate }, context) => {
       if (context?.previous) queryClient.setQueryData(['board', projectId], context.previous);
       const message = toErrorMessage(error);
-      setSlotError({ key: slot.key, message });
+      showSlotError(slot.key, message);
       announce(`${candidate.name} was not proposed: ${message}`, 'error');
-      setTimeout(() => setSlotError((e) => (e?.key === slot.key ? null : e)), 8000);
     },
     onSuccess: (_view, { candidate, slot }) => {
       const after = queryClient.getQueryData<ProjectBoard>(['board', projectId]);
-      const pct = after ? Math.round(teamCoverage(after, null).planned * 100) : null;
+      const pct = after ? Math.round(teamCoverage(after, after.assignments, null).planned * 100) : null;
       announce(
         `${candidate.name} proposed for ${slot.label.replace(/ \d+$/, '')}.${pct === null ? '' : ` Coverage ${pct}%.`}`,
       );
       coach.show('switchToManager');
     },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['board', projectId] });
-      void queryClient.invalidateQueries({ queryKey: ['candidates', projectId] });
-      void queryClient.invalidateQueries({ queryKey: ['approvals'] });
-    },
+    onSettled: invalidate,
   });
+
+  function invalidate() {
+    void queryClient.invalidateQueries({ queryKey: ['board', projectId] });
+    void queryClient.invalidateQueries({ queryKey: ['candidates', projectId] });
+    void queryClient.invalidateQueries({ queryKey: ['approvals'] });
+  }
+
+  function showSlotError(key: string, message: string) {
+    setSlotError({ key, message });
+    setTimeout(() => setSlotError((e) => (e?.key === key ? null : e)), 8000);
+  }
+
+  const draftBody = (d: Draft) => ({
+    start: d.start,
+    additions: d.additions.map((a) => ({
+      userId: a.candidate.userId,
+      slotRoleId: a.slotRoleId,
+      roleIds: a.roleIds,
+      hoursPerDay: a.hoursPerDay,
+    })),
+  });
+
+  // All-or-nothing: one transaction moves the project (if the start changed) and sends every proposal.
+  const commit = useMutation({
+    mutationFn: (d: Draft) => api.commitScenario(projectId, draftBody(d)),
+    onSuccess: (r) => {
+      const n = r.created.length;
+      const moved =
+        r.project.startDate !== baseStart ? `${data?.project.name} now starts ${formatDay(r.project.startDate)}. ` : '';
+      announce(`${moved}${n} proposal${n === 1 ? '' : 's'} sent.`);
+      setDraft(null);
+      setShareUrl(null);
+      if (n > 0) coach.show('switchToManager');
+    },
+    onError: (error) => {
+      const message = toErrorMessage(error);
+      const details =
+        error instanceof ApiError ? (error.error.details as { slotRoleId?: string; userId?: string }) : {};
+      const failed = slots.find(
+        (s) =>
+          s.assignment?.id.startsWith(DRAFT_ID_PREFIX) &&
+          (details.userId ? s.assignment.userId === details.userId : s.roleId === details.slotRoleId),
+      );
+      if (failed) showSlotError(failed.key, message);
+      announce(`Nothing was sent: ${message}`, 'error');
+    },
+    onSettled: invalidate,
+  });
+
+  const share = useMutation({
+    mutationFn: (d: Draft) => api.createSnapshot({ projectId, ...draftBody(d) }),
+    onSuccess: async ({ id }) => {
+      const url = `${location.origin}${location.pathname}${href.snapshot(id)}`;
+      setShareUrl(url);
+      try {
+        await navigator.clipboard.writeText(url);
+        announce('Link copied.');
+      } catch {
+        announce('Snapshot ready: copy the link below.');
+      }
+    },
+    onError: (error) => announce(toErrorMessage(error), 'error'),
+  });
+
+  const list = useMemo(() => {
+    const inDraft = new Set(draft?.additions.map((a) => a.candidate.userId));
+    const all = (candidates.data?.candidates ?? []).filter((c) => !inDraft.has(c.userId));
+    if (!evalWindow || (settled === start && !candidates.isPlaceholderData)) return all;
+    // Scrubbing: availability chips follow the slider live from the timelines already loaded.
+    const weeks = options.includeRollingOffWithinWeeks ?? ROLLING_OFF_WEEKS.max;
+    return all.map((c) => ({ ...c, availability: classifyAvailability(c.timeline, evalWindow, weeks) }));
+  }, [candidates.data, candidates.isPlaceholderData, draft, evalWindow, settled, start, options]);
+  const stale = settled !== start || candidates.isPlaceholderData;
+  useFlip(listRef, candidates.data);
 
   const closePopover = (userId: string | undefined) => {
     setPlacing(null);
@@ -172,7 +312,7 @@ export function Canvas({ projectId, session }: { projectId: string; session: Ses
   };
 
   if (board.isPending) return <CanvasSkeleton />;
-  if (board.isError || !data) {
+  if (board.isError || !data || !evalWindow) {
     return (
       <main className="canvas">
         <p role="alert">{toErrorMessage(board.error)}</p>
@@ -186,11 +326,11 @@ export function Canvas({ projectId, session }: { projectId: string; session: Ses
   const open = openSlots.length;
   const pm = session.personas.find((p) => p.id === data.project.pmId);
   const goal =
+    sentence ??
     `Staff ${data.project.name}: ` +
-    (open === 0 ? 'all slots filled' : `${open} slot${open === 1 ? '' : 's'} open`) +
-    (cov && cov.missing.length > 0 ? `, ${cov.missing.join(', ')} not covered` : ', all skills covered');
+      (open === 0 ? 'all slots filled' : `${open} slot${open === 1 ? '' : 's'} open`) +
+      (cov && cov.missing.length > 0 ? `, ${cov.missing.join(', ')} not covered` : ', all skills covered');
 
-  const list = candidates.data?.candidates ?? [];
   const now = list.filter((c) => c.availability.kind === 'available' || c.availability.kind === 'partial');
   const later = list.filter((c) => c.availability.kind === 'rollingOff');
   const booked = list.filter((c) => c.availability.kind === 'unavailable');
@@ -202,7 +342,7 @@ export function Canvas({ projectId, session }: { projectId: string; session: Ses
         addButtons.current.set(c.userId, el);
       }}
       candidate={c}
-      window={data.window}
+      window={evalWindow}
       skillName={skillName}
       canStaff={data.canStaff}
       draggable={!narrow}
@@ -221,16 +361,43 @@ export function Canvas({ projectId, session }: { projectId: string; session: Ses
       <header className="topbar">
         <p className="crumbs">
           <span className="brand">Team Finder</span> <span aria-hidden="true">▸</span> {data.project.name}
-          <span className="muted mono"> · {formatRange(data.project.startDate, data.project.deadline)}</span>
+          <span className="muted mono"> · {formatRange(evalWindow.from, evalWindow.to)}</span>
         </p>
-        <h1 className="goal" data-testid="goal">
-          {goal}
+        <h1 className={`goal${sentence ? ' goal-verdict' : ''}`} data-testid="goal">
+          {sentence ? (
+            <>
+              <span className="sr-only">{data.project.name}: </span>
+              {goal}
+            </>
+          ) : (
+            goal
+          )}
         </h1>
+        {data.canStaff && (
+          <ControlRow
+            board={data}
+            draft={draft}
+            dirty={dirty}
+            start={start!}
+            stale={stale && dirty}
+            shareUrl={shareUrl}
+            committing={commit.isPending}
+            sharing={share.isPending}
+            onFork={() => updateDraft((d) => d)}
+            onDiscard={() => {
+              setDraft(null);
+              setShareUrl(null);
+            }}
+            onScrub={(s) => updateDraft((d) => ({ ...d, start: s }))}
+            onCommit={() => draft && commit.mutate(draft)}
+            onShare={() => draft && share.mutate(draft)}
+          />
+        )}
       </header>
       <main className="canvas">
         <section className="slots" aria-labelledby="slots-title">
           <div className="section-head">
-            <h2 id="slots-title">Role slots</h2>
+            <h2 id="slots-title">Role slots{draft ? ' · draft' : ''}</h2>
             {cov && <CoverageMeter committed={cov.committed} planned={cov.planned} missing={cov.missing} />}
           </div>
           {!data.canStaff && (
@@ -255,8 +422,17 @@ export function Canvas({ projectId, session }: { projectId: string; session: Ses
                       index={s.index}
                       assignment={s.assignment}
                       dragging={dragging}
-                      window={data.window}
+                      window={evalWindow}
                       error={slotError?.key === s.key ? slotError.message : null}
+                      onRemove={
+                        s.assignment?.id.startsWith(DRAFT_ID_PREFIX)
+                          ? () =>
+                              updateDraft((d) => ({
+                                ...d,
+                                additions: d.additions.filter((a) => a.candidate.userId !== s.assignment!.userId),
+                              }))
+                          : undefined
+                      }
                     >
                       {placing?.slot.key === s.key && (
                         <ProposePopover
@@ -264,10 +440,28 @@ export function Canvas({ projectId, session }: { projectId: string; session: Ses
                           roleId={s.roleId}
                           roleName={roleName(s.roleId)}
                           roles={data.roles}
-                          window={data.window}
+                          window={evalWindow}
+                          mode={draft ? 'draft' : 'propose'}
                           onCancel={() => closePopover(placing.candidate.userId)}
                           onSubmit={(input) => {
-                            propose.mutate({ ...placing, input });
+                            if (draft) {
+                              const { candidate } = placing;
+                              updateDraft((d) => ({
+                                ...d,
+                                additions: [
+                                  ...d.additions,
+                                  {
+                                    candidate,
+                                    slotRoleId: s.roleId,
+                                    roleIds: input.roleIds,
+                                    hoursPerDay: input.hoursPerDay,
+                                  },
+                                ],
+                              }));
+                              announce(`${candidate.name} added to the draft as ${roleName(s.roleId)}.`);
+                            } else {
+                              propose.mutate({ ...placing, input });
+                            }
                             closePopover(placing.candidate.userId);
                           }}
                         />
@@ -279,10 +473,12 @@ export function Canvas({ projectId, session }: { projectId: string; session: Ses
           ))}
         </section>
 
-        <aside className="sidebar" aria-labelledby="candidates-title">
+        <aside className="sidebar" aria-labelledby="candidates-title" ref={listRef}>
           <div className="section-head">
             <h2 id="candidates-title">Candidates</h2>
-            <span className="muted">ranked</span>
+            <span className="muted">
+              {stale && dirty ? 're-ranking…' : rankStart ? `ranked for ${formatDay(rankStart)}` : 'ranked'}
+            </span>
           </div>
           <Filters options={options} onChange={setOptions} />
           {candidates.isPending && <SkeletonRows n={6} />}
@@ -300,27 +496,29 @@ export function Canvas({ projectId, session }: { projectId: string; session: Ses
               onRelax={(patch) => setOptions((o) => ({ ...o, ...patch }))}
             />
           )}
-          {now.length > 0 && (
-            <ul className="cards" aria-label="Available now">
-              {now.map(card)}
-            </ul>
-          )}
-          {later.length > 0 && (
-            <>
-              <h3 className="divider">Later</h3>
-              <ul className="cards" aria-label="Rolling off soon">
-                {later.map(card)}
+          <div className={stale && dirty ? 'cards-stale' : undefined}>
+            {now.length > 0 && (
+              <ul className="cards" aria-label="Available now">
+                {now.map(card)}
               </ul>
-            </>
-          )}
-          {booked.length > 0 && (
-            <>
-              <h3 className="divider">Fully booked</h3>
-              <ul className="cards" aria-label="Fully booked">
-                {booked.map(card)}
-              </ul>
-            </>
-          )}
+            )}
+            {later.length > 0 && (
+              <>
+                <h3 className="divider">Later</h3>
+                <ul className="cards" aria-label="Rolling off soon">
+                  {later.map(card)}
+                </ul>
+              </>
+            )}
+            {booked.length > 0 && (
+              <>
+                <h3 className="divider">Fully booked</h3>
+                <ul className="cards" aria-label="Fully booked">
+                  {booked.map(card)}
+                </ul>
+              </>
+            )}
+          </div>
         </aside>
       </main>
       <DragOverlay dropAnimation={{ duration: 120 }}>
@@ -339,12 +537,10 @@ interface SlotModel extends OpenSlot {
   assignment: BoardAssignment | undefined;
 }
 
-function buildSlots(board: ProjectBoard, roleName: (id: string) => string): SlotModel[] {
+function buildSlots(board: ProjectBoard, team: BoardAssignment[], roleName: (id: string) => string): SlotModel[] {
   return board.project.teamRoles.flatMap((tr) => {
     const order = { active: 0, deallocationProposed: 0, proposed: 1, rejected: 2, past: 2 } as const;
-    const members = board.assignments
-      .filter((a) => a.slotRoleId === tr.roleId)
-      .sort((a, b) => order[a.status] - order[b.status]);
+    const members = team.filter((a) => a.slotRoleId === tr.roleId).sort((a, b) => order[a.status] - order[b.status]);
     return Array.from({ length: Math.max(tr.count, members.length) }, (_, index) => ({
       key: `${tr.roleId}:${index}`,
       roleId: tr.roleId,
@@ -355,11 +551,11 @@ function buildSlots(board: ProjectBoard, roleName: (id: string) => string): Slot
   });
 }
 
-/** Committed (active) vs planned (active + pending, plus the card being dragged) coverage. */
-function teamCoverage(board: ProjectBoard, dragging: CandidateView | null) {
+/** Committed (active) vs planned (active + pending + draft, plus the card being dragged) coverage. */
+function teamCoverage(board: ProjectBoard, team: BoardAssignment[], dragging: CandidateView | null) {
   const targets = projectTargets(board.project);
-  const active = board.assignments.filter((a) => a.status === 'active' || a.status === 'deallocationProposed');
-  const planned = [...board.assignments, ...(dragging ? [{ skills: dragging.skills }] : [])];
+  const active = team.filter((a) => a.status === 'active' || a.status === 'deallocationProposed');
+  const planned = [...team, ...(dragging ? [{ skills: dragging.skills }] : [])];
   const p = coverage(targets, planned);
   const name = (id: string) => board.skills.find((s) => s.id === id)?.name ?? 'skill';
   return { committed: coverage(targets, active).ratio, planned: p.ratio, missing: p.missing.map(name) };
