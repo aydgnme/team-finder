@@ -4,7 +4,7 @@
 
 **A team-first staffing canvas.** Start from the shape of a project team, drag ranked candidates into role slots, and see capacity, skill coverage and conflicts update before you commit. Every ranking explains itself, and approvals stay correct when two managers act at the same moment.
 
-> **Status: early development.** The staffing canvas (M1), staffing decisions (M1.5), AI-drafted teams (M1.75) and real accounts with roles (M2) work end to end locally (`pnpm dev:local`); deployment, the live demo link and the walkthrough GIF come next. See the [roadmap](#roadmap).
+> **Status: early development.** The staffing canvas (M1), staffing decisions (M1.5), AI-drafted teams (M1.75), real accounts with roles (M2) and organization data (M3a: departments, skills, projects and their lifecycle) work end to end locally (`pnpm dev:local`); deployment, the live demo link and the walkthrough GIF come next. See the [roadmap](#roadmap).
 
 **One decision, in numbers:** in the sample company, starting Atlas two weeks later lets the strongest backend developer roll off their current project first. The verdict line says so: *start +2 wk → coverage 83% → 100%, +0 overbooked days* (at the original start the same team would add 14 overbooked days).
 
@@ -70,8 +70,9 @@ To run against your own database instead, copy `apps/api/.env.example` to `apps/
 2. Follow the hint to switch to **Dana (Engineering Manager)** and approve Mira: the slot turns active.
 3. Approve Kai: the server re-checks capacity inside the transaction and refuses with the exact date and the most hours that would fit.
 4. **Start over** (bottom right), then follow the first hint: drag the start date two weeks later. Tom moves from "Later" to available as you drag. Add him to the draft: the verdict reads *+0 overbooked days*; drag back to the original start and it reads *+14*. **Share** gives a read-only link; **Move start and send 1 proposal** commits it all in one transaction.
-5. **Create your organization** (bottom right of the demo): you land on its Organization screen with an invite link. Open the link in a private window to join as an employee, then make them a project manager from the admin's window.
-6. **Start over**, then type *a backend dev, two weeks later* into **Draft with AI**: the draft, the start date and the verdict line fill in from one sentence. Locally this uses the deterministic fake provider when you run `LLM_PROVIDER=fake pnpm dev:local`; with `LLM_API_KEY` set it calls Claude.
+5. **Projects** (dock): move Orion to Closed. Its people's hours end today, so Kai's conflicting proposal on Atlas turns into a fit. As Olivia (Organization admin), the Departments tab moves people between departments, and their pending approvals follow them.
+6. **Create your organization** (bottom right of the demo): you land on its Organization screen with an invite link. Open the link in a private window to join as an employee, then make them a project manager from the admin's window.
+7. **Start over**, then type *a backend dev, two weeks later* into **Draft with AI**: the draft, the start date and the verdict line fill in from one sentence. Locally this uses the deterministic fake provider when you run `LLM_PROVIDER=fake pnpm dev:local`; with `LLM_API_KEY` set it calls Claude.
 
 ## Scripts
 
@@ -122,6 +123,9 @@ Everything is evaluated over the project window `[max(today, start), deadline)` 
 | `GET /api/org` · `POST /api/org/invite` | Org settings and invite link; replace the link (admins) |
 | `GET /api/org/members` · `PUT /api/org/members/:id/roles` | Members with their access roles; change roles (admins; the last admin stays) |
 | `GET/POST /api/team-roles` · `PATCH/DELETE /api/team-roles/:id` | Team roles, unique per org; delete only when unused (admins) |
+| `GET/POST /api/projects` · `PATCH/DELETE /api/projects/:id` · `POST /api/projects/:id/status` | Projects: list, create (PMs), edit and delete (their PM; delete only if never active), move status forward (closing ends started work) |
+| `GET/POST /api/departments` · `PATCH/DELETE /api/departments/:id` · `PUT .../manager` · `POST .../members` · `DELETE .../members/:userId` | Departments, managers (one each) and members |
+| `GET /api/skills` · `POST /api/skills` · `PUT/DELETE /api/skills/:id` · `POST/PATCH/DELETE /api/skill-categories[/:id]` · `PUT/DELETE /api/me/skills/:skillId` | Skill catalog (managers and admins add, authors change) and your own skills |
 | `GET /api/ai/status` · `POST /api/ai/search` | Whether AI drafts are enabled; draft a team from a plain-language request (checked picks, never written) |
 | `POST /api/snapshots` · `GET /api/snapshots/:id` | Share a draft as a server-rebuilt, read-only snapshot (demo: public for 30 days) |
 | `POST /api/assignments` | Propose a person for a role slot |
@@ -138,7 +142,9 @@ Every error uses one envelope, `{ code, message, details, hint }`, for example `
 - [ ] **M1.75** AI-drafted teams: Claude drafts from the engine's shortlist, the engine validates every pick, eval set (built and tested locally with the fake provider; real-model eval pending an API key)
 - [ ] **M2** Sign-up, login, invite links, access roles, team roles, cross-org isolation suite (built and tested locally)
 - [ ] **M2.5** Live concurrency demo ("Watch the race")
-- [ ] **M3–M5** Departments, skills, project lifecycle, endorsements, notifications, statistics
+- [ ] **M3a** Departments, skills, projects with status lifecycle (built and tested locally)
+- [ ] **M3b** Date edits with clamp and recheck, deallocation, project/employee/department views
+- [ ] **M4–M5** Endorsements, skill validation, notifications, statistics
 - [ ] **M7** Final polish, architecture notes and walkthrough
 
 Details and the cut order are in [docs/design.md](docs/design.md#next-steps-milestones); deferred ideas are tracked in [TODOS.md](TODOS.md).
