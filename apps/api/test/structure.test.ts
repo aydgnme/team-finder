@@ -195,6 +195,18 @@ describe('projects (Project-01)', () => {
     expect(code(await call(app, pat, 'PATCH', `/api/projects/${orion.id}`, { name: 'Again' }))).toBe('VALIDATION');
   });
 
+  it('closing never extends an assignment that already ended', async () => {
+    const { pat, project } = await demo();
+    const orion = await project('Orion');
+    // Mira's Orion work stopped on 2026-02-01, but the record is still active (nobody closed it).
+    await database.db
+      .collection('assignments')
+      .updateOne({ projectId: orion.id, hoursPerDay: 2 }, { $set: { to: '2026-02-01' } });
+    await call(app, pat, 'POST', `/api/projects/${orion.id}/status`, { status: 'closed' });
+    const mira = await database.db.collection('assignments').findOne({ projectId: orion.id, hoursPerDay: 2 });
+    expect(mira).toMatchObject({ status: 'past', to: '2026-02-01' });
+  });
+
   it('closing before anyone started rejects the whole team', async () => {
     const { pat, project } = await demo();
     const atlas = await project('Atlas');
@@ -275,6 +287,19 @@ describe('departments (Department-01..03)', () => {
 
     const dana = await as(olivia, 'Dana');
     expect((await call(app, dana, 'POST', '/api/departments', { name: 'Ops' })).statusCode).toBe(403);
+  });
+
+  it('keeps the Department manager role while someone still manages a department', async () => {
+    const { pat, person } = await demo();
+    const olivia = await as(pat, 'Olivia');
+    const res = await call(app, olivia, 'PUT', `/api/org/members/${person('Dana')}/roles`, { roles: [] });
+    expect(code(res)).toBe('VALIDATION');
+    expect(res.json().message).toContain('manages Engineering');
+    const eng = (await depts(olivia)).departments.find((d) => d.name === 'Engineering')!;
+    await call(app, olivia, 'PUT', `/api/departments/${eng.id}/manager`, { managerId: null });
+    expect((await call(app, olivia, 'PUT', `/api/org/members/${person('Dana')}/roles`, { roles: [] })).statusCode).toBe(
+      200,
+    );
   });
 
   it('lets a manager take unassigned people and let members go, re-routing approvals', async () => {
