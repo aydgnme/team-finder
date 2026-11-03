@@ -11,7 +11,8 @@
     "@fastify/cookie": "11.1.5",
     "@team-finder/domain": "workspace:*",
     "fastify": "5.12.8",
-    "mongodb": "7.8.0"
+    "mongodb": "7.8.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "mongodb-memory-server": "11.3.0"
