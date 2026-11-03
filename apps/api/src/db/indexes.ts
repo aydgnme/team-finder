@@ -48,6 +48,24 @@ export const INDEXES: DeclaredIndex[] = [
     options: { unique: true, partialFilterExpression: { inviteToken: { $type: 'string' } } },
   },
   {
+    collection: 'skillCategories',
+    name: 'org_name_unique_ci',
+    key: { orgId: 1, name: 1 },
+    options: { unique: true, collation: { locale: 'en', strength: 2 } },
+  },
+  {
+    collection: 'skills',
+    name: 'org_name_unique_ci',
+    key: { orgId: 1, name: 1 },
+    options: { unique: true, collation: { locale: 'en', strength: 2 } },
+  },
+  {
+    collection: 'departments',
+    name: 'org_name_unique_ci',
+    key: { orgId: 1, name: 1 },
+    options: { unique: true, collation: { locale: 'en', strength: 2 } },
+  },
+  {
     collection: 'teamRoles',
     name: 'org_name_unique_ci',
     key: { orgId: 1, name: 1 },
@@ -62,6 +80,12 @@ export const INDEXES: DeclaredIndex[] = [
     options: { unique: true, partialFilterExpression: { managerId: { $type: 'string' } } },
   },
   { collection: 'userSkills', name: 'org_user', key: { orgId: 1, userId: 1 } },
+  {
+    collection: 'userSkills',
+    name: 'org_user_skill_unique',
+    key: { orgId: 1, userId: 1, skillId: 1 },
+    options: { unique: true },
+  },
   { collection: 'projects', name: 'org_pm', key: { orgId: 1, pmId: 1 } },
   { collection: 'assignments', name: 'org_user_status_from', key: { orgId: 1, userId: 1, status: 1, from: 1 } },
   { collection: 'assignments', name: 'org_project_status', key: { orgId: 1, projectId: 1, status: 1 } },

@@ -48,6 +48,13 @@ interface Victim {
   assignmentIds: string[];
   userId: string;
   teamRoleId: string;
+  departmentId: string;
+  skillId: string;
+  categoryId: string;
+}
+
+async function firstId(collection: string, orgId: string): Promise<string> {
+  return String((await database.db.collection(collection).findOne({ orgId }))!._id);
 }
 
 async function demoVictim(): Promise<{ pm: Visitor; victim: Victim }> {
@@ -61,6 +68,9 @@ async function demoVictim(): Promise<{ pm: Visitor; victim: Victim }> {
       assignmentIds: board.assignments.map((a) => a.id),
       userId: board.assignments[0]!.userId,
       teamRoleId: board.project.teamRoles[0]!.roleId,
+      departmentId: await firstId('departments', pm.info.org.id),
+      skillId: await firstId('skills', pm.info.org.id),
+      categoryId: await firstId('skillCategories', pm.info.org.id),
     },
   };
 }
@@ -68,15 +78,32 @@ async function demoVictim(): Promise<{ pm: Visitor; victim: Victim }> {
 async function realVictim(): Promise<{ admin: Visitor; victim: Victim }> {
   const admin = await realOrg('Victim Corp');
   const role = await call(app, admin, 'POST', '/api/team-roles', { name: 'Architect' });
+  // The admin also becomes a PM and a department manager so the org owns one of everything.
+  await call(app, admin, 'PUT', `/api/org/members/${admin.info.user.id}/roles`, {
+    roles: ['admin', 'projectManager', 'deptManager'],
+  });
+  const dept = await call(app, admin, 'POST', '/api/departments', { name: 'Platform' });
+  const category = await call(app, admin, 'POST', '/api/skill-categories', { name: 'Cloud' });
+  const skill = await call(app, admin, 'POST', '/api/skills', { name: 'AWS', categoryId: category.json().id });
+  const project = await call(app, admin, 'POST', '/api/projects', {
+    name: 'Secret Project',
+    period: 'fixed',
+    startDate: '2026-04-01',
+    deadline: '2026-06-01',
+    teamRoles: [{ roleId: role.json().id, count: 1 }],
+  });
+  expect(project.statusCode, project.body).toBe(201);
   return {
     admin,
     victim: {
       orgId: admin.info.org.id,
-      // A real org has no projects until M3; project routes are covered by the demo victim.
-      projectId: 'none',
+      projectId: project.json().id,
       assignmentIds: [],
       userId: admin.info.user.id,
       teamRoleId: role.json().id,
+      departmentId: dept.json().id,
+      skillId: skill.json().id,
+      categoryId: category.json().id,
     },
   };
 }
@@ -102,6 +129,19 @@ function attacks(v: Victim): [string, 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE
     ['change roles', 'PUT', `/api/org/members/${v.userId}/roles`, { roles: ['admin'] }],
     ['rename a team role', 'PATCH', `/api/team-roles/${v.teamRoleId}`, { name: 'Pwned' }],
     ['delete a team role', 'DELETE', `/api/team-roles/${v.teamRoleId}`, {}],
+    ['edit a project', 'PATCH', `/api/projects/${project}`, { name: 'Pwned' }],
+    ['close a project', 'POST', `/api/projects/${project}/status`, { status: 'closed' }],
+    ['delete a project', 'DELETE', `/api/projects/${project}`, {}],
+    ['rename a department', 'PATCH', `/api/departments/${v.departmentId}`, { name: 'Pwned' }],
+    ['delete a department', 'DELETE', `/api/departments/${v.departmentId}`, {}],
+    ['set a manager', 'PUT', `/api/departments/${v.departmentId}/manager`, { managerId: null }],
+    ['add to a department', 'POST', `/api/departments/${v.departmentId}/members`, { userId: v.userId }],
+    ['remove from a department', 'DELETE', `/api/departments/${v.departmentId}/members/${v.userId}`, {}],
+    ['rename a category', 'PATCH', `/api/skill-categories/${v.categoryId}`, { name: 'Pwned' }],
+    ['delete a category', 'DELETE', `/api/skill-categories/${v.categoryId}`, {}],
+    ['edit a skill', 'PUT', `/api/skills/${v.skillId}`, { name: 'Pwned', categoryId: v.categoryId }],
+    ['delete a skill', 'DELETE', `/api/skills/${v.skillId}`, {}],
+    ['claim a skill', 'PUT', `/api/me/skills/${v.skillId}`, { level: 5, experience: '7y+' }],
   ];
 }
 

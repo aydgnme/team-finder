@@ -10,6 +10,7 @@ import { aiRoutes } from './routes/ai.ts';
 import { authRoutes } from './routes/auth.ts';
 import { demoRoutes } from './routes/demo.ts';
 import { orgRoutes } from './routes/org.ts';
+import { structureRoutes } from './routes/structure.ts';
 import { scenarioRoutes } from './routes/scenarios.ts';
 import { staffingRoutes } from './routes/staffing.ts';
 
@@ -117,6 +118,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
     perEmail: createLimiter(rl.loginPerEmail),
   });
   orgRoutes(app, deps, { mutations });
+  structureRoutes(app, deps, { mutations });
   aiRoutes(app, deps, {
     provider: options.aiProvider ?? null,
     perSession: createLimiter(rl.aiPerSession),

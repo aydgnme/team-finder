@@ -44,11 +44,25 @@ export interface DepartmentDoc extends TenantDoc {
 
 export interface TeamRoleDoc extends TenantDoc {
   name: string;
+  /** Bumped by every transaction that starts referencing the role (no delete-while-used race). */
+  version?: number;
+}
+
+export interface SkillCategoryDoc extends TenantDoc {
+  name: string;
+  /** Bumped whenever a skill joins the category, so deleting it conflicts with that (see skills). */
+  version?: number;
 }
 
 export interface SkillDoc extends TenantDoc {
   name: string;
-  category: string;
+  description: string;
+  categoryId: string;
+  /** Who created it; only the author edits or deletes it (Skill-01). Null for seeded skills. */
+  authorId: string | null;
+  departmentIds: string[];
+  /** Bumped by every transaction that starts referencing the skill (no delete-while-used race). */
+  version?: number;
 }
 
 export interface UserSkillDoc extends TenantDoc {
@@ -109,6 +123,7 @@ export interface TenantCollections {
   users: UserDoc;
   departments: DepartmentDoc;
   teamRoles: TeamRoleDoc;
+  skillCategories: SkillCategoryDoc;
   skills: SkillDoc;
   userSkills: UserSkillDoc;
   projects: ProjectDoc;
@@ -119,6 +134,7 @@ export const TENANT_COLLECTIONS = [
   'users',
   'departments',
   'teamRoles',
+  'skillCategories',
   'skills',
   'userSkills',
   'projects',

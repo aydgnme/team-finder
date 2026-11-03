@@ -115,9 +115,18 @@ export async function renameTeamRole(ctx: ServiceContext, id: string, name: stri
 
 export async function deleteTeamRole(ctx: ServiceContext, id: string): Promise<{ id: string }> {
   requireAdmin(ctx, 'manage team roles');
-  const role = await ctx.repo.teamRoles.findOne({ _id: id });
-  if (!role) fail('NOT_FOUND', { resource: 'team role', id });
-  if (await teamRoleInUse(ctx, id)) fail('IN_USE', { resource: 'team role' });
-  await ctx.repo.teamRoles.deleteMany({ _id: id });
-  return { id };
+  const { repo } = ctx;
+  // In a transaction that writes the role: a project saved at the same moment touches the same
+  // document (references.ts), so the role cannot vanish under it.
+  return repo.withTransaction(async (session) => {
+    const role = await repo.teamRoles.findOne({ _id: id }, { session });
+    if (!role) fail('NOT_FOUND', { resource: 'team role', id });
+    const [projects, assignments] = await Promise.all([
+      repo.projects.countDocuments({ 'teamRoles.roleId': id }, { session }),
+      repo.assignments.countDocuments({ roleIds: id }, { session }),
+    ]);
+    if (projects + assignments > 0) fail('IN_USE', { resource: 'team role' });
+    await repo.teamRoles.deleteMany({ _id: id }, { session });
+    return { id };
+  });
 }

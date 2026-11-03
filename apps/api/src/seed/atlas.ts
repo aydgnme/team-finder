@@ -4,6 +4,7 @@ import type {
   AssignmentDoc,
   DepartmentDoc,
   ProjectDoc,
+  SkillCategoryDoc,
   SkillDoc,
   TeamRoleDoc,
   UserDoc,
@@ -33,6 +34,7 @@ export interface SeedData {
   users: Seedless<UserDoc>[];
   departments: Seedless<DepartmentDoc>[];
   teamRoles: Seedless<TeamRoleDoc>[];
+  skillCategories: Seedless<SkillCategoryDoc>[];
   skills: Seedless<SkillDoc>[];
   userSkills: Seedless<UserSkillDoc>[];
   projects: Seedless<ProjectDoc>[];
@@ -182,6 +184,8 @@ export function atlasSeed(today: string, now: Date = new Date()): SeedData {
   const userId = id(Object.keys(PEOPLE) as PersonKey[]);
   const deptId = id(['eng', 'design'] as const);
   const projectId = id(['atlas', 'orion', 'borealis', 'cobalt', 'helios'] as const);
+  const categories = [...new Set(Object.values(SKILLS).map((s) => s[1]))];
+  const categoryId = new Map(categories.map((name) => [name, newId()]));
 
   const atlasStart = addDays(today, 7);
   const atlasEnd = addDays(atlasStart, 84);
@@ -341,10 +345,14 @@ export function atlasSeed(today: string, now: Date = new Date()): SeedData {
       { _id: deptId.design, name: 'Design', managerId: null },
     ],
     teamRoles: (Object.keys(ROLES) as RoleKey[]).map((k) => ({ _id: roleId[k], name: ROLES[k] })),
+    skillCategories: categories.map((name) => ({ _id: categoryId.get(name)!, name })),
     skills: (Object.keys(SKILLS) as SkillKey[]).map((k) => ({
       _id: skillId[k],
       name: SKILLS[k][0],
-      category: SKILLS[k][1],
+      description: '',
+      categoryId: categoryId.get(SKILLS[k][1])!,
+      authorId: null,
+      departmentIds: [deptId.eng],
     })),
     userSkills,
     projects,
