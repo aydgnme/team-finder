@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
+    "eval:ai": "pnpm --filter @team-finder/api eval:ai",
     "test:prepare": "pnpm --filter @team-finder/api exec node -e \"import('mongodb-memory-server').then(m => m.MongoBinary.getPath()).then(p => console.log(p))\"",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
