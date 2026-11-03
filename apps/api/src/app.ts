@@ -5,6 +5,8 @@ import type { Database } from './db/client.ts';
 import { registerResolveActor, type RequestDeps } from './http/actor.ts';
 import { registerErrorHandling } from './http/errors.ts';
 import { createLimiter, type RateLimit } from './http/rate-limit.ts';
+import type { DraftProvider } from './ai/provider.ts';
+import { aiRoutes } from './routes/ai.ts';
 import { demoRoutes } from './routes/demo.ts';
 import { scenarioRoutes } from './routes/scenarios.ts';
 import { staffingRoutes } from './routes/staffing.ts';
@@ -16,12 +18,18 @@ export interface RateLimits {
   demoGlobal: RateLimit;
   /** Mutations per session. */
   mutationsPerSession: RateLimit;
+  /** AI drafts per session (each one is a paid model call). */
+  aiPerSession: RateLimit;
+  /** AI drafts across all sessions per day (the spend cap). */
+  aiDaily: RateLimit;
 }
 
 export const DEFAULT_RATE_LIMITS: RateLimits = {
   demoPerClient: { max: 10, windowMs: 60_000 },
   demoGlobal: { max: 30, windowMs: 60_000 },
   mutationsPerSession: { max: 60, windowMs: 60_000 },
+  aiPerSession: { max: 5, windowMs: 60_000 },
+  aiDaily: { max: 300, windowMs: 24 * 60 * 60_000 },
 };
 
 export interface AppOptions {
@@ -36,6 +44,8 @@ export interface AppOptions {
   trustProxy?: boolean | number | string;
   now?: () => Date;
   rateLimits?: Partial<RateLimits>;
+  /** AI-01 drafts; null or omitted disables the feature (GET /api/ai/status says so). */
+  aiProvider?: DraftProvider | null;
 }
 
 /** Cookie used by /api/health to prove the browser sends first-party cookies back through the /api proxy. */
@@ -94,6 +104,11 @@ export function buildApp(options: AppOptions): FastifyInstance {
   });
   staffingRoutes(app, deps, { mutations });
   scenarioRoutes(app, deps, { mutations });
+  aiRoutes(app, deps, {
+    provider: options.aiProvider ?? null,
+    perSession: createLimiter(rl.aiPerSession),
+    daily: createLimiter(rl.aiDaily),
+  });
 
   return app;
 }

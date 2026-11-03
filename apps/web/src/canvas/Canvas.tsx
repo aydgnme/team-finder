@@ -31,6 +31,7 @@ import { coach } from '../lib/coach.ts';
 import { useFlip } from '../lib/flip.ts';
 import { firstName, formatDay, formatRange } from '../lib/format.ts';
 import { href } from '../lib/route.ts';
+import { AiPanel } from './AiPanel.tsx';
 import { CoverageMeter } from './bars.tsx';
 import { CandidateCard, type OpenSlot } from './CandidateCard.tsx';
 import { ControlRow } from './ControlRow.tsx';
@@ -480,6 +481,28 @@ export function Canvas({ projectId, session }: { projectId: string; session: Ses
               {stale && dirty ? 're-ranking…' : rankStart ? `ranked for ${formatDay(rankStart)}` : 'ranked'}
             </span>
           </div>
+          {data.canStaff && (
+            <AiPanel
+              projectId={projectId}
+              roleName={roleName}
+              onDraft={(r) => {
+                const additions = r.items
+                  .filter((i) => i.verdict.kind !== 'rejected')
+                  .map((i) => ({
+                    candidate: i.candidate,
+                    slotRoleId: i.slotRoleId,
+                    roleIds: [],
+                    hoursPerDay: i.hoursPerDay,
+                  }));
+                setShareUrl(null);
+                setDraft({ start: r.start, additions });
+                const moved = r.start !== data.project.startDate ? ` Start moved to ${formatDay(r.start)}.` : '';
+                // The AI draft replaces the previous one (drafts are client-only); say so rather than lose it silently.
+                const replaced = dirty ? ' It replaced your previous draft.' : '';
+                announce(`AI draft: ${additions.length} added to the draft.${moved}${replaced} Review, then commit.`);
+              }}
+            />
+          )}
           <Filters options={options} onChange={setOptions} />
           {candidates.isPending && <SkeletonRows n={6} />}
           {candidates.isError && (

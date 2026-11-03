@@ -1,0 +1,54 @@
+name: AI eval
+
+# Nightly run of the AI-01 eval set (apps/api/src/ai/eval.ts) against the real model. Each run is
+# ~20 small paid requests, so it runs on a schedule (and by hand), never per PR; PRs run the same
+# set with the fake provider inside `pnpm test`. Skipped until the LLM_API_KEY secret exists.
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    env:
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+    steps:
+      - name: Check for the API key
+        id: key
+        run: |
+          if [ -z "$LLM_API_KEY" ]; then
+            echo "::notice::LLM_API_KEY secret is not set; skipping the AI eval."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v5
+        if: steps.key.outputs.present == 'true'
+      - uses: pnpm/action-setup@v4
+        if: steps.key.outputs.present == 'true'
+      - uses: actions/setup-node@v5
+        if: steps.key.outputs.present == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: steps.key.outputs.present == 'true'
+      - name: Cache mongod binary for MongoMemoryReplSet
+        if: steps.key.outputs.present == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm test:prepare
+        if: steps.key.outputs.present == 'true'
+      - run: pnpm eval:ai --min=0.8 --out="$RUNNER_TEMP/ai-eval.json"
+        if: steps.key.outputs.present == 'true'
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.key.outputs.present == 'true'
+        with:
+          name: ai-eval
+          path: ${{ runner.temp }}/ai-eval.json

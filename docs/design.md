@@ -35,7 +35,7 @@ Read straight off the spec, this is ~20 CRUD forms. The interesting part is one 
 
 1. **Plain screens, first-class invariants.** The canvas is the only hero-polished surface. All other SRS screens (departments, skills, roles, approvals, views) use clean consistent components with no hero treatment, BUT capacity, date-overlap, tenant isolation, and approval atomicity are treated as first-class engineering with tests and atomic writes. *(Revised after cross-model challenge.)*
 2. **No signup wall on the demo.** The live URL opens into a seeded org with a role switcher (Project Manager / Dept Manager / Org Admin / Employee). Real auth (Auth-01..03, invite URL) exists and works behind it.
-3. **Deterministic, explainable ranking first; LLM second.** The scoring engine is pure code with a visible breakdown. AI-01 only translates natural language into structured search criteria for that engine. The LLM never ranks or picks people.
+3. **Deterministic, explainable ranking first; LLM second.** The scoring engine is pure code with a visible breakdown. AI-01 (as revised at the /autoplan gate, see "AI-01") lets the LLM draft a team *only from the engine's top-ranked candidates*, seen pseudonymously; the engine validates every placement and nothing is proposed without the PM. The LLM never ranks, never sees names, and never commits anything.
 4. **MongoDB with a separate `assignments` collection,** not embedded in users or projects. Availability is computed from it.
 5. **MVP done (end of M1) =** live URL, README with a 30-second GIF at the top, CI running domain unit tests + one Playwright e2e of the canvas flow. The v1 target is the Success Criteria section below.
 

@@ -44,7 +44,7 @@ export const DomainError = z.discriminatedUnion('code', [
   ),
   envelope('UNSUPPORTED_MEDIA_TYPE', z.object({ contentType: z.string().optional() })),
   envelope('DB_UNAVAILABLE', none),
-  envelope('AI_UNAVAILABLE', none),
+  envelope('AI_UNAVAILABLE', z.object({ reason: z.string().optional() })),
   envelope('RATE_LIMITED', z.object({ retryAfterSeconds: z.number() })),
   envelope('INTERNAL', z.object({ requestId: z.string().optional() })),
 ]);
@@ -119,9 +119,9 @@ const TEXTS: { [C in ErrorCode]: Texts<C> } = {
     message: 'The database is not reachable right now.',
     hint: 'Retry in a few seconds. Locally, run "pnpm dev:local" for an in-memory replica set.',
   }),
-  AI_UNAVAILABLE: () => ({
-    message: 'The AI assistant is unavailable.',
-    hint: 'Manual staffing still works.',
+  AI_UNAVAILABLE: (d) => ({
+    message: d.reason ? `The AI assistant is unavailable: ${d.reason}.` : 'The AI assistant is unavailable.',
+    hint: 'Manual staffing still works; your filters and draft are unchanged.',
   }),
   RATE_LIMITED: (d) => ({
     message: 'Too many requests.',

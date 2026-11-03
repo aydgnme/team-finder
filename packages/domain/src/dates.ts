@@ -5,7 +5,14 @@ import { z } from 'zod';
  * on both client and server (docs/design.md, Data model). ISO day strings sort lexicographically,
  * which is what MongoDB range queries rely on.
  */
-export const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a YYYY-MM-DD date');
+export const Day = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a YYYY-MM-DD date')
+  // "2026-02-30" matches the pattern but is not a day; Date would silently roll it to March 2.
+  .refine((d) => {
+    const t = Date.parse(`${d}T00:00:00Z`);
+    return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === d;
+  }, 'Not a calendar date');
 export type Day = string;
 
 /** Half-open interval `[from, to)`; `to: null` means open-ended (ongoing project). */

@@ -60,6 +60,10 @@ The staffing canvas is the one hero surface; everything else uses the same token
 
 **Scrubber** — native range input, `--scrub-thumb` thumb; label "Start Tue Nov 24" in Plex Mono; arrows = 1 day, PageUp/PageDown = 1 week, Home/End = range ends; `aria-valuetext` "Start Tue Nov 24, 2 wk later"; "+6 wk max" at the end. Only before the project starts. While it moves, availability chips update in place and the list dims ("re-ranking…"); 300 ms after it stops the ranked order is refetched and reorders with a 240 ms FLIP (off under reduced motion). < 768px: the control row sticks to the top, scrubber full width with a 44px target.
 
+**AI panel** — one row at the top of the candidate list ("Draft with AI", text input, "Draft team"); results below it: one line per pick with a verdict in Plex Mono (✓ fits at N h/day in accent, ⚠ overbooked from <date> in `--conflict`, ✕ not added: <reason> muted), the rationale as plain lines, and "Checked by the engine · drafted by <model> · candidates sent as c1, c2…, never by name". Accepted picks become the draft at the suggested start; no new slot states are needed. Off state: a muted one-liner, "AI drafts are off: set LLM_API_KEY on the server to enable them."
+
+**Candidate list (≥ 768px)** — scrolls on its own, sticky beside the slots, so dragging a card never scrolls the target slot out of view.
+
 **Dock** — persona switcher ("Viewing as"), Canvas / Approvals (with pending count for managers), org name. Coach-marks (max two, dismissible, remembered in localStorage) appear above it.
 
 ## States
@@ -73,6 +77,7 @@ The staffing canvas is the one hero surface; everything else uses the same token
 | Session expired | — | — | modal "Your demo session ended" + Start a new demo | — |
 | Scenario commit | button "Sending…" | button disabled until the draft changes something | nothing is sent; the failing slot shows the reason; toast "Nothing was sent: …" | "Atlas now starts Nov 24. 1 proposal sent."; the draft becomes the new current team |
 | Share | button "Sharing…" | — | toast with the error | "Link copied." (or "copy the link below" when the clipboard is blocked) |
+| AI draft | button "Drafting…" | "No picks. Try naming roles…" | inline alert: "The AI assistant is unavailable: <reason>." (declined, timed out, unreadable, daily limit, not configured) or "Too many requests"; draft and filters unchanged | picks with verdicts + rationale; toast "AI draft: N added to the draft. Start moved to <date>." |
 | Snapshot page | blank | — | "This snapshot has expired" + Try the live demo | header "Snapshot · Nov 3 · read-only", verdict, slots, CTA |
 
 ## Responsive and accessibility

@@ -14,6 +14,8 @@ export default defineConfig({
   // Same command a reviewer runs: in-memory replica set + API + web (docs/design.md, DX #1).
   webServer: {
     command: 'pnpm dev:local --no-watch',
+    // AI drafts run against the deterministic fake provider: no key, no cost, stable answers.
+    env: { LLM_PROVIDER: 'fake' },
     url: 'http://localhost:5173/api/health',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
