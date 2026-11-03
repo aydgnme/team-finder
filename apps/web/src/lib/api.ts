@@ -1,5 +1,9 @@
 import {
   AiDraftResponse,
+  DepartmentProjects,
+  NoApproverResponse,
+  PersonProjects,
+  ProjectDetails,
   DepartmentsResponse,
   ProjectsResponse,
   ProjectSummary,
@@ -188,6 +192,19 @@ export const api = {
     request(Ok, `/api/me/skills/${encodeURIComponent(skillId)}`, { method: 'PUT', body: { level, experience } }),
   removeMySkill: (skillId: string) =>
     request(Ok, `/api/me/skills/${encodeURIComponent(skillId)}`, { method: 'DELETE' }),
+  projectDetails: (id: string) => request(ProjectDetails, `/api/projects/${encodeURIComponent(id)}/details`),
+  personProjects: (id: string) => request(PersonProjects, `/api/people/${encodeURIComponent(id)}/projects`),
+  departmentProjects: (id: string, status?: string) =>
+    request(
+      DepartmentProjects,
+      `/api/departments/${encodeURIComponent(id)}/projects${status ? `?status=${encodeURIComponent(status)}` : ''}`,
+    ),
+  noApprover: () => request(NoApproverResponse, '/api/org/no-approver'),
+  deallocate: (assignmentId: string, version: number, reason: string) =>
+    request(AssignmentView, `/api/assignments/${encodeURIComponent(assignmentId)}/deallocate`, {
+      method: 'POST',
+      body: { version, reason },
+    }),
   aiStatus: () => request(AiStatus, '/api/ai/status'),
   aiSearch: (body: AiSearchRequest) => request(AiDraftResponse, '/api/ai/search', { method: 'POST', body }),
 };

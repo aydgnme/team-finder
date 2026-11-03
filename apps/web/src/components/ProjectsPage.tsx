@@ -39,11 +39,14 @@ export function ProjectsPage({ session }: { session: SessionInfo }) {
       </header>
       <main className="org-page">
         {projects.isError && <p role="alert">{toErrorMessage(projects.error)}</p>}
-        {data && data.canCreate && !creating && (
-          <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
-            New project
-          </button>
-        )}
+        <p className="projects-head">
+          {data && data.canCreate && !creating && (
+            <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+              New project
+            </button>
+          )}
+          <a href={href.person(session.user.id)}>My projects</a>
+        </p>
         {creating && <ProjectForm onDone={() => setCreating(false)} />}
         {data && data.projects.length === 0 && (
           <p className="note" data-testid="no-projects">
@@ -98,7 +101,7 @@ function ProjectRow({ project: p }: { project: ProjectSummary }) {
   return (
     <li className="project-row" data-testid={`project-${p.name}`}>
       <div className="project-main">
-        <a className="project-name" href={href.canvas(p.id)}>
+        <a className="project-name" href={href.project(p.id)}>
           {p.name}
         </a>
         <span className={`status status-${p.status}`}>{STATUS_LABEL[p.status]}</span>
@@ -109,6 +112,13 @@ function ProjectRow({ project: p }: { project: ProjectSummary }) {
         </span>
       </div>
       {p.description && <p className="muted project-desc">{p.description}</p>}
+      {!editing && (
+        <div className="project-actions">
+          <a className="btn btn-small" href={href.canvas(p.id)}>
+            Staff
+          </a>
+        </div>
+      )}
       {p.canEdit && !editing && (
         <div className="project-actions">
           {p.status !== 'closed' && (
@@ -183,7 +193,9 @@ function ProjectForm({ project, onDone }: { project?: ProjectSummary; onDone: ()
   });
   const [teamRoles, setTeamRoles] = useState<RoleRow[]>(project?.teamRoles ?? []);
   const [techStack, setTechStack] = useState<string[]>(project?.techStack ?? []);
-  const datesLocked = Boolean(project && project.slots.filled > 0);
+  // Started projects keep their start (it records when work began); the deadline still moves, and
+  // the server clamps everyone's assignments, refusing dates that would overbook someone.
+  const startLocked = Boolean(project && project.startDate <= new Date().toISOString().slice(0, 10));
 
   const save = useMutation({
     mutationFn: () => {
@@ -194,7 +206,8 @@ function ProjectForm({ project, onDone }: { project?: ProjectSummary; onDone: ()
           description: f.description,
           teamRoles,
           techStack,
-          ...(datesLocked ? {} : { startDate: f.startDate, deadline }),
+          ...(startLocked ? {} : { startDate: f.startDate }),
+          deadline,
         });
       }
       const body: CreateProjectRequest = { ...f, deadline, teamRoles, techStack };
@@ -204,6 +217,7 @@ function ProjectForm({ project, onDone }: { project?: ProjectSummary; onDone: ()
       announce(project ? `${p.name} saved.` : `${p.name} created.`);
       void queryClient.invalidateQueries({ queryKey: ['projects'] });
       void queryClient.invalidateQueries({ queryKey: ['board', p.id] });
+      void queryClient.invalidateQueries({ queryKey: ['project-details', p.id] });
       onDone();
     },
   });
@@ -252,24 +266,24 @@ function ProjectForm({ project, onDone }: { project?: ProjectSummary; onDone: ()
             type="date"
             required
             value={f.startDate}
-            disabled={datesLocked}
+            disabled={startLocked}
             onChange={(e) => set('startDate')(e.target.value)}
           />
         </label>
         {f.period === 'fixed' && (
           <label className="field">
             <span>Deadline</span>
-            <input
-              type="date"
-              required
-              value={f.deadline}
-              disabled={datesLocked}
-              onChange={(e) => set('deadline')(e.target.value)}
-            />
+            <input type="date" required value={f.deadline} onChange={(e) => set('deadline')(e.target.value)} />
           </label>
         )}
       </div>
-      {datesLocked && <p className="muted field-hint">Dates are locked while people are proposed or assigned.</p>}
+      {project && project.slots.filled > 0 && (
+        <p className="muted field-hint">
+          The team moves with the dates: nobody starts earlier than planned, and full-length assignments follow the
+          deadline.
+        </p>
+      )}
+      {startLocked && <p className="muted field-hint">The project has started, so its start date stays.</p>}
 
       <fieldset className="form-group">
         <legend>Team roles</legend>
