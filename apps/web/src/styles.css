@@ -1435,3 +1435,13 @@ kbd {
   gap: 8px;
   margin-top: 12px;
 }
+
+/* The dock carries more since M3a; the org label is the first thing to give way. */
+@media (max-width: 1399px) {
+  .dock-org {
+    display: none;
+  }
+  .dock-auth {
+    margin-left: auto;
+  }
+}
