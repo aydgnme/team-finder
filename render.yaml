@@ -1,0 +1,19 @@
+# Render blueprint for the API. Set MONGODB_URI in the Render dashboard (Atlas connection string).
+services:
+  - type: web
+    name: team-finder-api
+    runtime: node
+    plan: free
+    # Node >= 25 ships without corepack, so install pnpm explicitly.
+    buildCommand: npm i -g pnpm@12.11.2 && pnpm install --frozen-lockfile --filter @team-finder/api...
+    startCommand: pnpm --filter @team-finder/api start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: '26'
+      - key: MONGODB_DB
+        value: team-finder
+      - key: MONGODB_URI
+        sync: false
