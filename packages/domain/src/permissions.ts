@@ -30,6 +30,20 @@ export interface PermissionResources {
   'org.view': InOrg;
   /** Invite link, access roles, team roles (Role-01/02, Auth-02): org admins. */
   'org.manage': InOrg;
+  /** Create, rename, delete departments and pick their managers (Department-01/02). */
+  'department.manage': InOrg;
+  /** Move people in and out of a department (Department-03): admins, or its manager. */
+  'department.members': InOrg & { managerId: string | null };
+  /** Create skill categories and skills (Skill-01). */
+  'skill.create': InOrg;
+  /** Edit, link or delete a skill: its author only. */
+  'skill.edit': InOrg & { authorId: string | null };
+  /** Create projects (Project-01). */
+  'project.create': InOrg;
+  /** Edit, change status of, or delete a project: its PM. */
+  'project.edit': InOrg & { pmId: string };
+  /** Self-assign skills (Skill-02): only your own. */
+  'userSkill.edit': InOrg & { userId: string };
 }
 export type Action = keyof PermissionResources;
 
@@ -46,6 +60,13 @@ const RULES: { [A in Action]: (actor: Actor, resource: PermissionResources[A]) =
   'snapshot.share': (actor) => has(actor, 'projectManager') || has(actor, 'deptManager') || has(actor, 'admin'),
   'org.view': () => true,
   'org.manage': (actor) => has(actor, 'admin'),
+  'department.manage': (actor) => has(actor, 'admin'),
+  'department.members': (actor, d) => has(actor, 'admin') || (d.managerId !== null && d.managerId === actor.userId),
+  'skill.create': (actor) => has(actor, 'deptManager') || has(actor, 'admin'),
+  'skill.edit': (actor, s) => s.authorId !== null && s.authorId === actor.userId,
+  'project.create': (actor) => has(actor, 'projectManager'),
+  'project.edit': (actor, p) => has(actor, 'projectManager') && p.pmId === actor.userId,
+  'userSkill.edit': (actor, u) => u.userId === actor.userId,
 };
 
 /** Pure permission check. Cross-org access is always denied, whatever the role. */
