@@ -1468,3 +1468,95 @@ kbd {
 .block {
   display: block;
 }
+
+/* ---- Watch the race (M2.5) ---- */
+.race-page p {
+  max-width: 720px;
+}
+.race-figure {
+  margin: 16px 0;
+}
+.race-lanes {
+  position: relative;
+  padding: 18px 0 4px;
+}
+.race-lane {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  align-items: center;
+  gap: 12px;
+  height: 36px;
+}
+.race-lane-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+.race-track {
+  position: relative;
+  height: 10px;
+  margin-right: 8px;
+}
+.race-bar {
+  position: absolute;
+  top: 3px;
+  height: 4px;
+  background: var(--accent);
+}
+.race-refused .race-bar {
+  background: var(--conflict);
+}
+.race-mark {
+  position: absolute;
+  top: -2px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+}
+.race-refused .race-mark {
+  border-color: var(--conflict);
+}
+.race-mark-replay {
+  border-style: dashed;
+}
+.race-mark-committed {
+  background: var(--accent);
+}
+.race-mark-refused {
+  background: var(--conflict);
+}
+.race-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 22px;
+  left: 132px;
+  right: 8px;
+  pointer-events: none;
+}
+.race-barrier {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed var(--text-muted);
+}
+.race-barrier span {
+  position: absolute;
+  top: -2px;
+  left: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.race-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-left: 132px;
+  margin-right: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.race-text {
+  font-size: 13px;
+  padding-left: 18px;
+}

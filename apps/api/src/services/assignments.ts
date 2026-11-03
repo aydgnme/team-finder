@@ -228,7 +228,21 @@ export async function proposeDeallocation(ctx: ServiceContext, assignmentId: str
  * the same person both write the user document, so one hits a write conflict; the driver replays it,
  * the replay sees the other approval and throws CapacityError (409 CAPACITY_EXCEEDED).
  */
-export async function approve(ctx: ServiceContext, assignmentId: string, version: number): Promise<AssignmentView> {
+export interface ApproveOptions {
+  /**
+   * Called on every transaction attempt after capacity was read and checked, right before the first
+   * write. Only the "Watch the race" demo passes it (to hold both approvals at a barrier); production
+   * passes nothing, so the demo proves this exact code path.
+   */
+  afterRead?: () => Promise<void>;
+}
+
+export async function approve(
+  ctx: ServiceContext,
+  assignmentId: string,
+  version: number,
+  options: ApproveOptions = {},
+): Promise<AssignmentView> {
   const { repo, actor, today, now } = ctx;
   return repo.withTransaction(async (session) => {
     const a = await loadDecision(ctx, assignmentId, version, session);
@@ -255,6 +269,7 @@ export async function approve(ctx: ServiceContext, assignmentId: string, version
         maxHours: check.maxHours,
       });
     }
+    await options.afterRead?.();
 
     const from = check.window.from;
     const updated = await repo.assignments.updateOne(

@@ -7,6 +7,7 @@ import { NotConfiguredScreen, SessionEndedModal, SetupScreen, WakingScreen } fro
 import { JoinPage, LoginPage, SignUpPage } from './components/AuthPages.tsx';
 import { DepartmentsPage } from './components/DepartmentsPage.tsx';
 import { OrgPage } from './components/OrgPage.tsx';
+import { RacePage } from './components/RacePage.tsx';
 import { ProjectsPage } from './components/ProjectsPage.tsx';
 import { SkillsPage } from './components/SkillsPage.tsx';
 import { DepartmentProjectsPage, PersonPage, ProjectPage } from './components/ViewPages.tsx';
@@ -84,6 +85,8 @@ function DemoApp() {
     <div className="app">
       {route.name === 'approvals' ? (
         <ApprovalsInbox session={info} />
+      ) : route.name === 'race' ? (
+        <RacePage session={info} />
       ) : route.name === 'org' ? (
         <OrgPage session={info} />
       ) : route.name === 'departments' ? (

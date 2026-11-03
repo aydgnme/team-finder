@@ -10,6 +10,7 @@ import { aiRoutes } from './routes/ai.ts';
 import { authRoutes } from './routes/auth.ts';
 import { demoRoutes } from './routes/demo.ts';
 import { orgRoutes } from './routes/org.ts';
+import { raceRoutes } from './routes/race.ts';
 import { structureRoutes } from './routes/structure.ts';
 import { scenarioRoutes } from './routes/scenarios.ts';
 import { staffingRoutes } from './routes/staffing.ts';
@@ -25,6 +26,8 @@ export interface RateLimits {
   authPerClient: RateLimit;
   /** Login attempts per email address. */
   loginPerEmail: RateLimit;
+  /** "Watch the race" runs per session. */
+  racePerSession: RateLimit;
   /** AI drafts per session (each one is a paid model call). */
   aiPerSession: RateLimit;
   /** AI drafts across all sessions per day (the spend cap). */
@@ -37,6 +40,7 @@ export const DEFAULT_RATE_LIMITS: RateLimits = {
   mutationsPerSession: { max: 60, windowMs: 60_000 },
   authPerClient: { max: 10, windowMs: 60_000 },
   loginPerEmail: { max: 10, windowMs: 15 * 60_000 },
+  racePerSession: { max: 5, windowMs: 60_000 },
   aiPerSession: { max: 5, windowMs: 60_000 },
   aiDaily: { max: 300, windowMs: 24 * 60 * 60_000 },
 };
@@ -53,6 +57,8 @@ export interface AppOptions {
   trustProxy?: boolean | number | string;
   now?: () => Date;
   rateLimits?: Partial<RateLimits>;
+  /** Demo-only routes such as POST /api/demo/race (default on; DEMO_ROUTES_ENABLED=false turns them off). */
+  demoRoutesEnabled?: boolean;
   /** AI-01 drafts; null or omitted disables the feature (GET /api/ai/status says so). */
   aiProvider?: DraftProvider | null;
 }
@@ -119,6 +125,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
   });
   orgRoutes(app, deps, { mutations });
   structureRoutes(app, deps, { mutations });
+  raceRoutes(app, deps, { enabled: options.demoRoutesEnabled ?? true, perSession: createLimiter(rl.racePerSession) });
   aiRoutes(app, deps, {
     provider: options.aiProvider ?? null,
     perSession: createLimiter(rl.aiPerSession),

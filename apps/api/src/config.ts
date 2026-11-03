@@ -7,6 +7,8 @@ export interface Config {
   production: boolean;
   trustProxy: boolean | number | string;
   rateLimits: Partial<RateLimits>;
+  /** DEMO_ROUTES_ENABLED=false turns off demo-only routes (the race). Default on. */
+  demoRoutesEnabled: boolean;
   /** AI-01: "anthropic" when LLM_API_KEY is set, "fake" when LLM_PROVIDER=fake, otherwise off. */
   ai: { provider: 'anthropic'; apiKey: string; model: string | undefined } | { provider: 'fake' } | { provider: 'off' };
 }
@@ -50,5 +52,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       ...(aiDailyCap > 0 ? { aiDaily: { max: aiDailyCap, windowMs: 24 * 60 * 60_000 } } : {}),
     },
     ai,
+    demoRoutesEnabled: env.DEMO_ROUTES_ENABLED !== 'false',
   };
 }

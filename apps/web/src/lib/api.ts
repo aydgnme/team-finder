@@ -1,5 +1,6 @@
 import {
   AiDraftResponse,
+  RaceResult,
   DepartmentProjects,
   NoApproverResponse,
   PersonProjects,
@@ -205,6 +206,7 @@ export const api = {
       method: 'POST',
       body: { version, reason },
     }),
+  race: () => request(RaceResult, '/api/demo/race', { method: 'POST' }),
   aiStatus: () => request(AiStatus, '/api/ai/status'),
   aiSearch: (body: AiSearchRequest) => request(AiDraftResponse, '/api/ai/search', { method: 'POST', body }),
 };

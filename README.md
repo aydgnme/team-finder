@@ -4,9 +4,16 @@
 
 **A team-first staffing canvas.** Start from the shape of a project team, drag ranked candidates into role slots, and see capacity, skill coverage and conflicts update before you commit. Every ranking explains itself, and approvals stay correct when two managers act at the same moment.
 
-> **Status: early development.** The staffing canvas (M1), staffing decisions (M1.5), AI-drafted teams (M1.75), real accounts with roles (M2) and organization data (M3: departments, skills, projects with their lifecycle, date moves, deallocation and views) work end to end locally (`pnpm dev:local`); deployment, the live demo link and the walkthrough GIF come next. See the [roadmap](#roadmap).
+> **Status: early development.** The staffing canvas (M1), staffing decisions (M1.5), AI-drafted teams (M1.75), real accounts with roles (M2) and organization data (M3: departments, skills, projects with their lifecycle, date moves, deallocation and views) and the live concurrency demo (M2.5) work end to end locally (`pnpm dev:local`); deployment, the live demo link and the walkthrough GIF come next. See the [roadmap](#roadmap).
 
 **One decision, in numbers:** in the sample company, starting Atlas two weeks later lets the strongest backend developer roll off their current project first. The verdict line says so: *start +2 wk → coverage 83% → 100%, +0 overbooked days* (at the original start the same team would add 14 overbooked days).
+
+## Hard problems
+
+- **Two approvals, one person, same instant.** Two managers approve 5 h/day each for someone with 8 h free. Exactly one wins and the other is refused with `409 CAPACITY_EXCEEDED`, every time. See it on the demo's **How it works** page, or run `pnpm demo:race` from a fresh clone (about 2 s, `--runs=20` to repeat it). Both run the production `approve()`, held at a barrier after the capacity check so the race is real; [apps/api/test/race.test.ts](apps/api/test/race.test.ts) runs it 20 times and [docs/architecture.md](docs/architecture.md#concurrency-proof) explains why the loser is replayed.
+- **Comparing a decision before making it.** One pure `compareScenarios()` produces the verdict line in the browser and on the server ([architecture](docs/architecture.md#scenario-verdict)).
+- **No cross-org leaks.** Every id-taking route is attacked with another org's ids and the victim's documents are fingerprinted before and after ([apps/api/test/isolation.test.ts](apps/api/test/isolation.test.ts), [architecture](docs/architecture.md#tenant-isolation)).
+- **Why MongoDB and not Postgres exclusion constraints:** [ADR 0001](docs/adr/0001-mongodb-capacity.md).
 
 Inspired by the "Team Finder" brief from the ASSIST Tech Challenge 2024, rebuilt as an independent project.
 
@@ -81,6 +88,7 @@ To run against your own database instead, copy `apps/api/.env.example` to `apps/
 | `pnpm dev:local` | In-memory replica set + API + web app; also used by the e2e suite |
 | `pnpm dev` | Start API and web app in watch mode against `MONGODB_URI` |
 | `pnpm test` | Unit and API tests (first run downloads a MongoDB binary; `pnpm test:prepare` fetches it ahead of time) |
+| `pnpm demo:race` | Run the concurrency race in a throwaway in-memory database and print both lanes (`--runs=N` to repeat) |
 | `pnpm eval:ai` | AI-01 eval set: real model with `LLM_API_KEY` (about 20 small paid requests), or free with `LLM_PROVIDER=fake` |
 | `pnpm e2e` | Playwright tests in Chromium and WebKit against `pnpm dev:local` (`pnpm exec playwright install` once) |
 | `pnpm lint` / `pnpm format:check` / `pnpm typecheck` | Static checks, also enforced in CI |
@@ -128,6 +136,7 @@ Everything is evaluated over the project window `[max(today, start), deadline)` 
 | `GET /api/skills` · `POST /api/skills` · `PUT/DELETE /api/skills/:id` · `POST/PATCH/DELETE /api/skill-categories[/:id]` · `PUT/DELETE /api/me/skills/:skillId` | Skill catalog (managers and admins add, authors change) and your own skills |
 | `GET /api/projects/:id/details` · `GET /api/people/:id/projects` · `GET /api/departments/:id/projects?status=` | Views: a project and its team; someone's projects (them, their manager, admins); a department's projects (its manager, admins) |
 | `POST /api/assignments/:id/deallocate` | The PM asks to end an assignment (with a reason); the manager decides through approve/reject |
+| `POST /api/demo/race` | Run two concurrent approvals in a throwaway org and return both lanes' events (demo sandboxes only, one at a time, 5 per minute; `DEMO_ROUTES_ENABLED=false` turns it off) |
 | `GET /api/org/no-approver` | Pending items nobody can decide, for admins |
 | `GET /api/ai/status` · `POST /api/ai/search` | Whether AI drafts are enabled; draft a team from a plain-language request (checked picks, never written) |
 | `POST /api/snapshots` · `GET /api/snapshots/:id` | Share a draft as a server-rebuilt, read-only snapshot (demo: public for 30 days) |
@@ -144,7 +153,7 @@ Every error uses one envelope, `{ code, message, details, hint }`, for example `
 - [ ] **M1.5** Staffing decisions: draft vs current team, start-date scrubber, verdict line, atomic commit, share snapshots (built and tested locally; deploy and GIF pending)
 - [ ] **M1.75** AI-drafted teams: Claude drafts from the engine's shortlist, the engine validates every pick, eval set (built and tested locally with the fake provider; real-model eval pending an API key)
 - [ ] **M2** Sign-up, login, invite links, access roles, team roles, cross-org isolation suite (built and tested locally)
-- [ ] **M2.5** Live concurrency demo ("Watch the race")
+- [ ] **M2.5** Live concurrency demo ("Watch the race", `pnpm demo:race`), architecture notes and ADR 0001 (built and tested locally; deployed demo pending)
 - [ ] **M3a** Departments, skills, projects with status lifecycle (built and tested locally)
 - [ ] **M3b** Date edits with clamp and recheck, deallocation, project/employee/department views (built and tested locally)
 - [ ] **M4–M5** Endorsements, skill validation, notifications, statistics
