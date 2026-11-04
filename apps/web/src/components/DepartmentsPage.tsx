@@ -127,9 +127,18 @@ function DepartmentCard({ dept: d, data }: { dept: DepartmentView; data: Departm
           </form>
         )}
         {d.canManageMembers && rename === null && (
-          <a className="btn btn-small btn-ghost" href={href.departmentProjects(d.id)}>
-            Projects
-          </a>
+          <>
+            <a className="btn btn-small btn-ghost" href={href.departmentProjects(d.id)}>
+              Projects
+            </a>
+            <a
+              className="btn btn-small btn-ghost"
+              href={href.departmentStats(d.id)}
+              aria-label={`Skill stats for ${d.name}`}
+            >
+              Stats
+            </a>
+          </>
         )}
         {data.canManage && rename === null && (
           <span className="team-role-actions">

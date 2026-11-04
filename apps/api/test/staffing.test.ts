@@ -70,7 +70,8 @@ describe('GET /api/projects/:id/candidates', () => {
     expect(r.candidates.map((c) => c.name)).toEqual(['Noor Haddad', 'Jo Park']);
     expect(r.excluded).toEqual({
       onProject: 3,
-      noSkillMatch: 3, // Pat, Dana and Olivia (PM, manager, admin) hold no project skills
+      // Pat, Dana and Olivia hold no project skills, nor do the 49 people of the other practices (M5).
+      noSkillMatch: 52,
       belowMinLevel: 0,
       partial: 1,
       rollingOff: 1,

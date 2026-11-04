@@ -4,7 +4,7 @@
 
 **A team-first staffing canvas.** Start from the shape of a project team, drag ranked candidates into role slots, and see capacity, skill coverage and conflicts update before you commit. Every ranking explains itself, and approvals stay correct when two managers act at the same moment.
 
-> **Status: early development.** The staffing canvas (M1), staffing decisions (M1.5), AI-drafted teams (M1.75), real accounts with roles (M2) and organization data (M3: departments, skills, projects with their lifecycle, date moves, deallocation and views) the live concurrency demo (M2.5), notifications, skill validation and required skill levels (M4a), and endorsements and skill suggestions (M4b) work end to end locally (`pnpm dev:local`); deployment, the live demo link and the walkthrough GIF come next. See the [roadmap](#roadmap).
+> **Status: early development.** The staffing canvas (M1), staffing decisions (M1.5), AI-drafted teams (M1.75), real accounts with roles (M2) and organization data (M3: departments, skills, projects with their lifecycle, date moves, deallocation and views) the live concurrency demo (M2.5), notifications, skill validation and required skill levels (M4a), endorsements and skill suggestions (M4b), and department skill statistics on a 60-person sample company (M5) work end to end locally (`pnpm dev:local`); deployment, the live demo link and the walkthrough GIF come next. See the [roadmap](#roadmap).
 
 **One decision, in numbers:** in the sample company, starting Atlas two weeks later lets the strongest backend developer roll off their current project first. The verdict line says so: *start +2 wk → coverage 83% → 100%, +0 overbooked days* (at the original start the same team would add 14 overbooked days).
 
@@ -65,7 +65,7 @@ pnpm install
 pnpm dev:local
 ```
 
-`pnpm dev:local` starts an in-memory MongoDB replica set (transactions need one), the API against it and the web app. Open http://localhost:5173: every visit clones the "Atlas" sample company into its own sandbox and lands on the canvas as the project manager. No accounts or environment variables are needed; the first run downloads a MongoDB binary.
+`pnpm dev:local` starts an in-memory MongoDB replica set (transactions need one), the API against it and the web app. Open http://localhost:5173: every visit clones the sample company (60 people, 12 projects, with the "Atlas" decision at its centre) into its own sandbox and lands on the canvas as the project manager. No accounts or environment variables are needed; the first run downloads a MongoDB binary.
 
 AI drafts are optional: set `LLM_API_KEY` (an Anthropic API key; model `claude-opus-5-5` unless `LLM_MODEL` says otherwise) to enable them, or `LLM_PROVIDER=fake` for the deterministic stand-in. Without either the panel says it is off and everything else works.
 
@@ -81,7 +81,8 @@ To run against your own database instead, copy `apps/api/.env.example` to `apps/
 6. **Create your organization** (bottom right of the demo): you land on its Organization screen with an invite link. Open the link in a private window to join as an employee, then make them a project manager from the admin's window.
 7. **Inbox** (dock): as Dana, three notifications are waiting. Open Jo's Go claim: in Approvals, **Validate** it and it starts counting for matching. As Ana, add AWS on Organization → Skills: it reads *Pending validation* until Dana decides. As Pat, give a project **Required skills** with a minimum level: people below it show as near misses.
 8. As Ana, the inbox suggests React (from the daily skill upgrade job): **Add React** sends it for validation. Under My skills, **Add evidence** to Node.js: a certification with a link, or a past project she worked on.
-9. **Start over**, then type *a backend dev, two weeks later* into **Draft with AI**: the draft, the start date and the verdict line fill in from one sentence. Locally this uses the deterministic fake provider when you run `LLM_PROVIDER=fake pnpm dev:local`; with `LLM_API_KEY` set it calls Claude.
+9. As Dana (or Olivia), **Organization → Departments → Stats** on Engineering: people per skill with the level split, and the same numbers as a table. Validated skills only.
+10. **Start over**, then type *a backend dev, two weeks later* into **Draft with AI**: the draft, the start date and the verdict line fill in from one sentence. Locally this uses the deterministic fake provider when you run `LLM_PROVIDER=fake pnpm dev:local`; with `LLM_API_KEY` set it calls Claude.
 
 ## Scripts
 
@@ -143,6 +144,7 @@ Everything is evaluated over the project window `[max(today, start), deadline)` 
 | `GET /api/notifications` · `GET /api/notifications/unread-count` · `POST /api/notifications/read` | Your inbox (newest 50), the dock badge, and marking your own notifications read (`{ids}` or `{all: true}`) |
 | `POST /api/assignments/:id/deallocate` | The PM asks to end an assignment (with a reason); the manager decides through approve/reject |
 | `POST /api/demo/race` | Run two concurrent approvals in a throwaway org and return both lanes' events (demo sandboxes only, one at a time, 5 per minute; `DEMO_ROUTES_ENABLED=false` turns it off) |
+| `GET /api/departments/:id/stats` | A department's validated skills: people per skill and per level (its manager, admins) |
 | `GET /api/org/no-approver` | Pending items nobody can decide, and skill claims only an admin can validate, for admins |
 | `GET /api/ai/status` · `POST /api/ai/search` | Whether AI drafts are enabled; draft a team from a plain-language request (checked picks, never written) |
 | `POST /api/snapshots` · `GET /api/snapshots/:id` | Share a draft as a server-rebuilt, read-only snapshot (demo: public for 30 days) |
@@ -164,7 +166,7 @@ Every error uses one envelope, `{ code, message, details, hint }`, for example `
 - [ ] **M3b** Date edits with clamp and recheck, deallocation, project/employee/department views (built and tested locally)
 - [ ] **M4a** Notifications (in the trigger's transaction), skill validation, required skill levels (built and tested locally)
 - [ ] **M4b** Endorsements, skill upgrade proposals with a daily, idempotent job (built and tested locally)
-- [ ] **M5** Statistics and seed
+- [ ] **M5** Department skill statistics, 60-person seed around the unchanged Atlas story (built and tested locally)
 - [ ] **M7** Final polish, architecture notes and walkthrough
 
 Details and the cut order are in [docs/design.md](docs/design.md#next-steps-milestones); deferred ideas are tracked in [TODOS.md](TODOS.md).

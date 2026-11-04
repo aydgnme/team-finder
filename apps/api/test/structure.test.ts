@@ -72,7 +72,21 @@ describe('projects (Project-01)', () => {
     const { list } = await demo();
     const r = await list();
     expect(r.canCreate).toBe(true);
-    expect(r.projects.map((p) => p.name)).toEqual(['Cobalt', 'Orion', 'Atlas', 'Borealis', 'Helios']);
+    // In progress first, then by start date (M5 adds 7 projects of other practices around Atlas's).
+    expect(r.projects.map((p) => `${p.status}:${p.name}`)).toEqual([
+      'inProgress:Cobalt',
+      'inProgress:Harbor',
+      'inProgress:Lumen',
+      'inProgress:Orion',
+      'inProgress:Quarry',
+      'inProgress:Pocket',
+      'starting:Atlas',
+      'starting:Prism',
+      'notStarted:Nimbus',
+      'closing:Borealis',
+      'closed:Tidal',
+      'closed:Helios',
+    ]);
     expect(r.projects.find((p) => p.name === 'Atlas')).toMatchObject({
       status: 'starting',
       pm: { name: 'Pat Reyes' },
@@ -255,10 +269,14 @@ describe('departments (Department-01..03)', () => {
     const r = await depts(pat);
     expect(r.canManage).toBe(false);
     expect(r.departments.map((d) => [d.name, d.manager?.name ?? null, d.members.length])).toEqual([
+      ['Cloud Platform', 'Hana Kim', 12],
+      ['Data', 'Priya Raman', 12],
       ['Design', null, 1],
       ['Engineering', 'Dana Okafor', 8],
+      ['Java Services', 'Omar Farouk', 12],
+      ['Mobile', 'Lucas Moreau', 12],
     ]);
-    expect(r.unassigned.map((u) => u.name)).toEqual(['Olivia Grant', 'Pat Reyes']);
+    expect(r.unassigned.map((u) => u.name)).toEqual(['Olivia Grant', 'Pat Reyes', 'Sam Ortiz']);
     expect(r.managerCandidates).toEqual([]);
   });
 
@@ -281,9 +299,9 @@ describe('departments (Department-01..03)', () => {
     ).toBe(200);
     expect((await depts(olivia)).departments.find((d) => d.name === 'Design')!.manager!.name).toBe('Noor Haddad');
 
-    const created = await call(app, olivia, 'POST', '/api/departments', { name: 'Data' });
+    const created = await call(app, olivia, 'POST', '/api/departments', { name: 'Research' });
     expect(created.statusCode).toBe(201);
-    expect(code(await call(app, olivia, 'POST', '/api/departments', { name: 'data' }))).toBe('NAME_TAKEN');
+    expect(code(await call(app, olivia, 'POST', '/api/departments', { name: 'research' }))).toBe('NAME_TAKEN');
     expect(code(await call(app, olivia, 'DELETE', `/api/departments/${design.id}`, {}))).toBe('IN_USE');
     expect((await call(app, olivia, 'DELETE', `/api/departments/${created.json().id}`, {})).statusCode).toBe(200);
 
@@ -352,13 +370,13 @@ describe('skills (Skill-01/02)', () => {
     expect(r.skills.find((s) => s.name === 'AWS')).toMatchObject({ author: null, canEdit: false, inUse: true });
 
     const created = await call(app, dana, 'POST', '/api/skills', {
-      name: 'Kubernetes',
+      name: 'Pulumi',
       categoryId: cloud.id,
-      description: 'Containers at scale',
+      description: 'Infrastructure as code',
     });
     expect(created.statusCode).toBe(201);
     const k8s = created.json().id as string;
-    expect(code(await call(app, dana, 'POST', '/api/skills', { name: 'kubernetes', categoryId: cloud.id }))).toBe(
+    expect(code(await call(app, dana, 'POST', '/api/skills', { name: 'pulumi', categoryId: cloud.id }))).toBe(
       'NAME_TAKEN',
     );
     expect(code(await call(app, dana, 'DELETE', `/api/skill-categories/${cloud.id}`, {}))).toBe('IN_USE');

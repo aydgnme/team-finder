@@ -1,5 +1,6 @@
 import { addDays, type AccessRole, type AssignmentStatus, type Experience } from '@team-finder/domain';
 import { newId } from '../db/org-repo.ts';
+import { addPractices } from './practices.ts';
 import type {
   AssignmentDoc,
   DepartmentDoc,
@@ -26,6 +27,9 @@ import type {
 //   Ines   Staff engineer, 8 h on ongoing Cobalt -> great but unavailable
 //   Jo     QA, fully available, partial fit
 //   Noor   Frontend, department without a manager -> no approver
+//
+// Around them, seed/practices.ts adds the rest of the 60-person company (Data, Mobile, Cloud
+// Platform, Java Services and their projects), none of whom can ever match Atlas.
 
 type Seedless<T> = Omit<T, 'orgId' | 'expiresAt'>;
 
@@ -412,7 +416,7 @@ export function atlasSeed(today: string, now: Date = new Date()): SeedData {
     ),
   ];
 
-  return {
+  const seed: SeedData = {
     orgName: 'Northwind Labs',
     landingProjectId: projectId.atlas,
     pmUserId: userId.pat,
@@ -437,4 +441,7 @@ export function atlasSeed(today: string, now: Date = new Date()): SeedData {
     notifications,
     skillUpgradeProposals: [anaUpgrade],
   };
+  // M5: the other practices (49 more people, 7 more projects) around the unchanged Atlas story.
+  addPractices(seed, today, now);
+  return seed;
 }

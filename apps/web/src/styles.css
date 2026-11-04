@@ -1666,3 +1666,100 @@ kbd {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* ---- M5: department skill stats (one hue for counts, an ordinal ramp for levels) ---- */
+.stats-figure {
+  margin: 16px 0 24px;
+  max-width: 820px;
+}
+.stats-figure figcaption {
+  margin-bottom: 8px;
+}
+.stat-legend {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.stat-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stat-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.stat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.stat-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 72px;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 0;
+}
+.stat-name {
+  font-weight: 500;
+}
+.stat-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.stat-track {
+  height: 14px;
+}
+.stat-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 0 4px 4px 0;
+  min-width: 2px;
+}
+.stat-bar:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+.stat-levels {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+}
+.stat-level {
+  flex-basis: 0;
+  border-radius: 2px;
+}
+.stat-value {
+  font-size: 13px;
+  text-align: right;
+}
+.stat-tip {
+  position: fixed;
+  transform: translate(-50%, calc(-100% - 8px));
+  background: var(--text);
+  color: #fff;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 30;
+}
+.stats-table td,
+.stats-table th {
+  white-space: nowrap;
+}
+@media (max-width: 767px) {
+  .stat-row {
+    grid-template-columns: 88px 1fr 56px;
+    gap: 8px;
+  }
+}

@@ -14,6 +14,7 @@ export type Route =
   | { name: 'project'; projectId: string }
   | { name: 'person'; userId: string }
   | { name: 'departmentProjects'; departmentId: string }
+  | { name: 'departmentStats'; departmentId: string }
   | { name: 'race' }
   | { name: 'inbox' };
 
@@ -28,6 +29,8 @@ function parse(hash: string): Route {
   if (hash.startsWith('#/login')) return { name: 'login' };
   if (hash.startsWith('#/org')) return { name: 'org' };
   if (hash === '#/projects' || hash === '#/projects/') return { name: 'projects' };
+  const deptStats = /^#\/departments\/([^/?]+)\/stats/.exec(hash);
+  if (deptStats) return { name: 'departmentStats', departmentId: decodeURIComponent(deptStats[1]!) };
   const deptProjects = /^#\/departments\/([^/?]+)\/projects/.exec(hash);
   if (deptProjects) return { name: 'departmentProjects', departmentId: decodeURIComponent(deptProjects[1]!) };
   if (hash.startsWith('#/departments')) return { name: 'departments' };
@@ -71,6 +74,7 @@ export const href = {
   project: (id: string) => `#/project/${encodeURIComponent(id)}`,
   person: (id: string) => `#/people/${encodeURIComponent(id)}`,
   departmentProjects: (id: string) => `#/departments/${encodeURIComponent(id)}/projects`,
+  departmentStats: (id: string) => `#/departments/${encodeURIComponent(id)}/stats`,
 };
 
 export function navigate(to: string) {
