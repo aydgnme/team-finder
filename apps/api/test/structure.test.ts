@@ -72,10 +72,21 @@ describe('projects (Project-01)', () => {
     const { list } = await demo();
     const r = await list();
     expect(r.canCreate).toBe(true);
-    // M5 adds 7 projects of other practices; the Atlas cast keeps its order among them.
-    expect(r.projects).toHaveLength(12);
-    const core = ['Cobalt', 'Orion', 'Atlas', 'Borealis', 'Helios'];
-    expect(r.projects.map((p) => p.name).filter((n) => core.includes(n))).toEqual(core);
+    // In progress first, then by start date (M5 adds 7 projects of other practices around Atlas's).
+    expect(r.projects.map((p) => `${p.status}:${p.name}`)).toEqual([
+      'inProgress:Cobalt',
+      'inProgress:Harbor',
+      'inProgress:Lumen',
+      'inProgress:Orion',
+      'inProgress:Quarry',
+      'inProgress:Pocket',
+      'starting:Atlas',
+      'starting:Prism',
+      'notStarted:Nimbus',
+      'closing:Borealis',
+      'closed:Tidal',
+      'closed:Helios',
+    ]);
     expect(r.projects.find((p) => p.name === 'Atlas')).toMatchObject({
       status: 'starting',
       pm: { name: 'Pat Reyes' },
