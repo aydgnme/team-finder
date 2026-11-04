@@ -141,7 +141,44 @@ export const SkillView = z.object({
   canEdit: z.boolean(),
 });
 export type SkillView = z.infer<typeof SkillView>;
-export const MySkill = z.object({ skillId: Id, level: SkillLevel, experience: Experience, validated: z.boolean() });
+// ---- endorsements (Skill-03) ----
+
+export const EndorsementKind = z.enum(['training', 'course', 'certification', 'project']);
+export type EndorsementKind = z.infer<typeof EndorsementKind>;
+export const MAX_ENDORSEMENTS = 10;
+export const Endorsement = z.object({
+  id: Id,
+  kind: EndorsementKind,
+  title: z.string(),
+  url: z.string().nullable(),
+  projectId: Id.nullable(),
+});
+export type Endorsement = z.infer<typeof Endorsement>;
+/** A project endorsement names the project (its title is taken from it); the others need a title. */
+export const AddEndorsementRequest = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('project'), projectId: Id }),
+  z.object({
+    kind: z.enum(['training', 'course', 'certification']),
+    title: z.string().trim().min(2, 'Use at least 2 characters').max(120),
+    url: z
+      .string()
+      .trim()
+      .url('Use a full link, like https://…')
+      .refine((u) => /^https?:\/\//i.test(u), 'Use an http(s) link')
+      .max(500)
+      .nullable()
+      .default(null),
+  }),
+]);
+export type AddEndorsementRequest = z.input<typeof AddEndorsementRequest>;
+
+export const MySkill = z.object({
+  skillId: Id,
+  level: SkillLevel,
+  experience: Experience,
+  validated: z.boolean(),
+  endorsements: z.array(Endorsement).default([]),
+});
 export type MySkill = z.infer<typeof MySkill>;
 export const SkillsResponse = z.object({
   categories: z.array(CategoryView),
@@ -171,6 +208,8 @@ export const SkillClaimItem = z.object({
   experience: Experience,
   /** The validated values a raise would replace; null for a new claim. */
   previous: z.object({ level: SkillLevel, experience: Experience }).nullable(),
+  /** Skill-03: the evidence the claimer attached. */
+  endorsements: z.array(Endorsement),
 });
 export type SkillClaimItem = z.infer<typeof SkillClaimItem>;
 export const SkillClaimDecision = z.object({ version: z.number().int().min(0) });
@@ -288,3 +327,27 @@ export const NoApproverResponse = z.object({
   /** Skill claims only an admin can validate (Skill-04 fallback). */
   skillClaims: z.array(SkillClaimItem),
 });
+
+// ---- skill upgrade proposals (Project-11) ----
+
+export const UPGRADE_EVERY_MONTHS = 3;
+export const UpgradeProposalView = z.object({
+  id: Id,
+  skill: z.object({ id: Id, name: z.string() }),
+  project: z.object({ id: Id, name: z.string() }),
+  /** The project's minimum level for this skill, if it sets one. */
+  minLevel: z.number().nullable(),
+  /** What you hold now (any claim, validated or not), if anything. */
+  current: z.object({ level: SkillLevel, experience: Experience, validated: z.boolean() }).nullable(),
+  createdAt: z.string(),
+});
+export type UpgradeProposalView = z.infer<typeof UpgradeProposalView>;
+export const UpgradeProposalsResponse = z.object({ proposals: z.array(UpgradeProposalView) });
+export const AcceptUpgradeRequest = SetMySkillRequest;
+
+/** Whole months from `from` to `to` (calendar months; a later day of month counts the month only once reached). */
+export function monthsBetween(from: string, to: string): number {
+  const [fy, fm, fd] = from.split('-').map(Number) as [number, number, number];
+  const [ty, tm, td] = to.split('-').map(Number) as [number, number, number];
+  return (ty - fy) * 12 + (tm - fm) - (td < fd ? 1 : 0);
+}
