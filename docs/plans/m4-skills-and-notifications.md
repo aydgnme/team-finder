@@ -64,3 +64,45 @@ Already in place from M1: the matching engine ignores unvalidated skills, and `m
 - Stale validate vs edit (`CONFLICT_STALE`).
 - Requirements validation and the near-miss on the canvas.
 - e2e: claim, validate, inbox.
+
+## Implementation notes (eng review, M4b)
+
+**Skill-03 endorsements.**
+- `userSkills.endorsements: [{id, kind: training|course|certification|project, title, url?, projectId?}]`, at most 10 per skill.
+- Only the owner adds or removes them: `POST /api/me/skills/:skillId/endorsements`, `DELETE /api/me/skills/:skillId/endorsements/:id`.
+- A `project` endorsement must name a project the owner worked on: an active, ending or past assignment. Its title is the project's name, snapshotted.
+- Endorsements are evidence, not a claim: adding one does not change validation. It bumps the claim's `version`, so a manager deciding on a claim never decides on evidence they did not see.
+- They are shown in My skills and next to a claim in "Skills to validate".
+
+**Project-11 upgrade proposals.**
+- Data: a new tenant collection `skillUpgradeProposals {userId, skillId, projectId, minLevel, status: open|accepted|dismissed, createdAt, decidedAt}`. A unique partial index on `(orgId, userId, skillId)` where `status = open` dedupes open proposals.
+- **The daily job:** `runUpgradeJob(database, store, now)` goes through every org through orgRepo and finds active (or ending) assignments whose `from` is at least 3 whole months back.
+  - `upgradeMilestone` on the assignment records the last multiple of 3 months handled. A rerun on the same day, or a second job running at the same time, does nothing: the milestone update is guarded by its old value inside the transaction.
+  - For each target of the project (tech stack ∪ requirements), it proposes the skill when the person holds no claim for it, or holds it below the requirement's `minLevel`.
+  - It skips a skill that already has an open proposal; there is one transaction per assignment.
+  - Each new proposal also writes a `skillUpgradeProposal` notification with no actor.
+- **Running it:** the server runs the job a minute after boot and then every 24 h (`UPGRADE_JOB_ENABLED`, on by default). Tests call it directly with a moved clock.
+- **Accepting and dismissing:**
+  - `GET /api/me/upgrade-proposals` lists your open proposals.
+  - `POST /api/me/upgrade-proposals/:id/accept {level, experience}` goes through the same code as Skill-02, so the result is a claim waiting for validation.
+  - `POST /api/me/upgrade-proposals/:id/dismiss`.
+  - A dismissed proposal can come back at the next 3-month milestone.
+- Web: a "Suggested for you" section above My skills (skill, project, a level and experience form, Add, Dismiss); the inbox link goes there.
+- Seed: one open proposal for Ana (React, from Atlas) and its notification, so the flow is visible on first visit.
+
+**Tests.**
+- Endorsements:
+  - only projects you were on;
+  - the 10-per-skill cap;
+  - the owner only;
+  - the version bump makes a stale decision.
+- Job:
+  - nothing before 3 months;
+  - one proposal per missing or under-level target;
+  - the same day again creates nothing;
+  - the next milestone after a dismissal proposes again;
+  - an open proposal is never duplicated;
+  - concurrent runs create one.
+- Accept creates a pending claim and notifies the validator; dismiss.
+- Isolation attacks on the new routes.
+- e2e: Ana accepts the suggestion and adds a certification.
