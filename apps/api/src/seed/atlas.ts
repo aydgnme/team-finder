@@ -4,6 +4,7 @@ import type {
   AssignmentDoc,
   DepartmentDoc,
   NotificationDoc,
+  SkillUpgradeProposalDoc,
   ProjectDoc,
   SkillCategoryDoc,
   SkillDoc,
@@ -41,6 +42,7 @@ export interface SeedData {
   projects: Seedless<ProjectDoc>[];
   assignments: Seedless<AssignmentDoc>[];
   notifications: Seedless<NotificationDoc>[];
+  skillUpgradeProposals: Seedless<SkillUpgradeProposalDoc>[];
 }
 
 const SKILLS = {
@@ -351,6 +353,18 @@ export function atlasSeed(today: string, now: Date = new Date()): SeedData {
     assignment('tom', 'helios', 'backend', 'past', 8, ...helios),
   ];
 
+  // Project-11: one suggestion waiting for Ana, so the upgrade flow is visible on first visit.
+  const anaUpgrade: Seedless<SkillUpgradeProposalDoc> = {
+    _id: newId(),
+    userId: userId.ana,
+    skillId: skillId.react,
+    projectId: projectId.atlas,
+    minLevel: null,
+    status: 'open',
+    createdAt: new Date(now.getTime() - 120 * 60_000),
+    decidedAt: null,
+  };
+
   // Notification-01: what the seed's pending items would have sent (Dana's inbox is not empty).
   const notification = (
     type: NotificationDoc['type'],
@@ -358,9 +372,10 @@ export function atlasSeed(today: string, now: Date = new Date()): SeedData {
     actorId: string | null,
     data: NotificationDoc['data'],
     minutesAgo: number,
+    to: PersonKey = 'dana',
   ): Seedless<NotificationDoc> => ({
     _id: newId(),
-    userId: userId.dana,
+    userId: userId[to],
     type,
     refId,
     actorId,
@@ -387,6 +402,14 @@ export function atlasSeed(today: string, now: Date = new Date()): SeedData {
         60 + i,
       ),
     ),
+    notification(
+      'skillUpgradeProposal',
+      anaUpgrade._id,
+      null,
+      { projectId: projectId.atlas, projectName: 'Atlas', skillName: SKILLS.react[0] },
+      120,
+      'ana',
+    ),
   ];
 
   return {
@@ -412,5 +435,6 @@ export function atlasSeed(today: string, now: Date = new Date()): SeedData {
     projects,
     assignments,
     notifications,
+    skillUpgradeProposals: [anaUpgrade],
   };
 }

@@ -1,4 +1,11 @@
-import type { AccessRole, AssignmentStatus, Experience, NotificationData, NotificationType } from '@team-finder/domain';
+import type {
+  AccessRole,
+  AssignmentStatus,
+  EndorsementKind,
+  Experience,
+  NotificationData,
+  NotificationType,
+} from '@team-finder/domain';
 
 // Stored document shapes. Ids are strings (ObjectId hex) so services never need the mongodb package.
 // Every tenant document carries `orgId`; demo sandboxes also carry `expiresAt` (TTL cleanup).
@@ -76,6 +83,27 @@ export interface UserSkillDoc extends TenantDoc {
   previous?: { level: number; experience: Experience } | null;
   /** Bumped by every change, so a validation never decides on values it did not see. */
   version?: number;
+  /** Skill-03: evidence the owner attached (trainings, courses, certifications, past projects). */
+  endorsements?: EndorsementDoc[];
+}
+
+export interface EndorsementDoc {
+  id: string;
+  kind: EndorsementKind;
+  title: string;
+  url: string | null;
+  projectId: string | null;
+}
+
+/** Project-11: a suggestion to add (or raise) a skill, from the daily upgrade job. */
+export interface SkillUpgradeProposalDoc extends TenantDoc {
+  userId: string;
+  skillId: string;
+  projectId: string;
+  minLevel: number | null;
+  status: 'open' | 'accepted' | 'dismissed';
+  createdAt: Date;
+  decidedAt: Date | null;
 }
 
 export type ProjectStatus = 'notStarted' | 'starting' | 'inProgress' | 'closing' | 'closed';
@@ -114,6 +142,8 @@ export interface AssignmentDoc extends TenantDoc {
   version: number;
   createdAt: Date;
   decidedAt?: Date;
+  /** Project-11: the last multiple of 3 months on the project the upgrade job has handled. */
+  upgradeMilestone?: number;
 }
 
 export interface NotificationDoc extends TenantDoc {
@@ -147,6 +177,7 @@ export interface TenantCollections {
   projects: ProjectDoc;
   assignments: AssignmentDoc;
   notifications: NotificationDoc;
+  skillUpgradeProposals: SkillUpgradeProposalDoc;
 }
 export type TenantCollectionName = keyof TenantCollections;
 export const TENANT_COLLECTIONS = [
@@ -159,4 +190,5 @@ export const TENANT_COLLECTIONS = [
   'projects',
   'assignments',
   'notifications',
+  'skillUpgradeProposals',
 ] as const satisfies TenantCollectionName[];

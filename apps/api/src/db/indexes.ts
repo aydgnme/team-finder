@@ -98,6 +98,13 @@ export const INDEXES: DeclaredIndex[] = [
   },
   { collection: 'notifications', name: 'org_user_created', key: { orgId: 1, userId: 1, createdAt: -1 } },
   { collection: 'notifications', name: 'org_user_unread', key: { orgId: 1, userId: 1, readAt: 1 } },
+  {
+    collection: 'skillUpgradeProposals',
+    name: 'org_user_skill_open_unique',
+    key: { orgId: 1, userId: 1, skillId: 1 },
+    // Project-11: at most one open suggestion per person and skill.
+    options: { unique: true, partialFilterExpression: { status: 'open' } },
+  },
   // Snapshots live outside tenancy (the one exception, see services/snapshots.ts) with their own expiry.
   ttl('snapshots'),
   { collection: 'snapshots', name: 'org_hash', key: { orgId: 1, hash: 1 } },

@@ -380,6 +380,7 @@ describe('skills (Skill-01/02)', () => {
       experience: '1-2y',
       // Skill-04 (M4a): a self-assigned skill waits for the department manager.
       validated: false,
+      endorsements: [],
     });
     const dana2 = await as(ana, 'Dana');
     expect(code(await call(app, dana2, 'DELETE', `/api/skills/${k8s}`, {}))).toBe('IN_USE');
