@@ -12,7 +12,7 @@ Implementation plans derived from the reviewed design in [../design.md](../desig
 | M2.5 Concurrency proof and docs | [m2.5-concurrency-proof.md](m2.5-concurrency-proof.md) | merged (#7) |
 | Polish bucket | [polish.md](polish.md) | planned, first to slip |
 | M3 Organization data | [m3-organization-data.md](m3-organization-data.md) | merged (#5, #6) |
-| M4 Skills lifecycle and notifications | [m4-skills-and-notifications.md](m4-skills-and-notifications.md) | M4a in review; M4b planned |
+| M4 Skills lifecycle and notifications | [m4-skills-and-notifications.md](m4-skills-and-notifications.md) | M4a merged (#8); M4b in review |
 | M5 Statistics and seed | [m5-statistics-and-seed.md](m5-statistics-and-seed.md) | planned |
 | M7 Release | [m7-release.md](m7-release.md) | planned |
 

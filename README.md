@@ -4,7 +4,7 @@
 
 **A team-first staffing canvas.** Start from the shape of a project team, drag ranked candidates into role slots, and see capacity, skill coverage and conflicts update before you commit. Every ranking explains itself, and approvals stay correct when two managers act at the same moment.
 
-> **Status: early development.** The staffing canvas (M1), staffing decisions (M1.5), AI-drafted teams (M1.75), real accounts with roles (M2) and organization data (M3: departments, skills, projects with their lifecycle, date moves, deallocation and views) the live concurrency demo (M2.5), and notifications, skill validation and required skill levels (M4a) work end to end locally (`pnpm dev:local`); deployment, the live demo link and the walkthrough GIF come next. See the [roadmap](#roadmap).
+> **Status: early development.** The staffing canvas (M1), staffing decisions (M1.5), AI-drafted teams (M1.75), real accounts with roles (M2) and organization data (M3: departments, skills, projects with their lifecycle, date moves, deallocation and views) the live concurrency demo (M2.5), notifications, skill validation and required skill levels (M4a), and endorsements and skill suggestions (M4b) work end to end locally (`pnpm dev:local`); deployment, the live demo link and the walkthrough GIF come next. See the [roadmap](#roadmap).
 
 **One decision, in numbers:** in the sample company, starting Atlas two weeks later lets the strongest backend developer roll off their current project first. The verdict line says so: *start +2 wk → coverage 83% → 100%, +0 overbooked days* (at the original start the same team would add 14 overbooked days).
 
@@ -80,7 +80,8 @@ To run against your own database instead, copy `apps/api/.env.example` to `apps/
 5. **Projects** (dock): open Orion and end Mira's assignment; as Dana, approve it in Approvals and her hours are free. Or move Orion to Closed. Its people's hours end today, so Kai's conflicting proposal on Atlas turns into a fit. As Olivia (Organization admin), the Departments tab moves people between departments, and their pending approvals follow them.
 6. **Create your organization** (bottom right of the demo): you land on its Organization screen with an invite link. Open the link in a private window to join as an employee, then make them a project manager from the admin's window.
 7. **Inbox** (dock): as Dana, three notifications are waiting. Open Jo's Go claim: in Approvals, **Validate** it and it starts counting for matching. As Ana, add AWS on Organization → Skills: it reads *Pending validation* until Dana decides. As Pat, give a project **Required skills** with a minimum level: people below it show as near misses.
-8. **Start over**, then type *a backend dev, two weeks later* into **Draft with AI**: the draft, the start date and the verdict line fill in from one sentence. Locally this uses the deterministic fake provider when you run `LLM_PROVIDER=fake pnpm dev:local`; with `LLM_API_KEY` set it calls Claude.
+8. As Ana, the inbox suggests React (from the daily skill upgrade job): **Add React** sends it for validation. Under My skills, **Add evidence** to Node.js: a certification with a link, or a past project she worked on.
+9. **Start over**, then type *a backend dev, two weeks later* into **Draft with AI**: the draft, the start date and the verdict line fill in from one sentence. Locally this uses the deterministic fake provider when you run `LLM_PROVIDER=fake pnpm dev:local`; with `LLM_API_KEY` set it calls Claude.
 
 ## Scripts
 
@@ -137,6 +138,8 @@ Everything is evaluated over the project window `[max(today, start), deadline)` 
 | `GET /api/skills` · `POST /api/skills` · `PUT/DELETE /api/skills/:id` · `POST/PATCH/DELETE /api/skill-categories[/:id]` · `PUT/DELETE /api/me/skills/:skillId` | Skill catalog (managers and admins add, authors change) and your own skills |
 | `GET /api/projects/:id/details` · `GET /api/people/:id/projects` · `GET /api/departments/:id/projects?status=` | Views: a project and its team; someone's projects (them, their manager, admins); a department's projects (its manager, admins) |
 | `POST /api/skills/claims/:id/validate` · `/reject` | Decide on a self-assigned skill or a raise (the claimer's department manager, never the claimer; admins when nobody else can). Reject removes a new claim or restores the validated level |
+| `POST /api/me/skills/:skillId/endorsements` · `DELETE .../endorsements/:id` | Evidence on your own skill: a training, course or certification (optional http(s) link), or a project you worked on; at most 10 |
+| `GET /api/me/upgrade-proposals` · `POST .../:id/accept` · `POST .../:id/dismiss` | Skills the daily upgrade job suggests after every 3 months on a project; accepting adds the skill for validation |
 | `GET /api/notifications` · `GET /api/notifications/unread-count` · `POST /api/notifications/read` | Your inbox (newest 50), the dock badge, and marking your own notifications read (`{ids}` or `{all: true}`) |
 | `POST /api/assignments/:id/deallocate` | The PM asks to end an assignment (with a reason); the manager decides through approve/reject |
 | `POST /api/demo/race` | Run two concurrent approvals in a throwaway org and return both lanes' events (demo sandboxes only, one at a time, 5 per minute; `DEMO_ROUTES_ENABLED=false` turns it off) |
@@ -160,7 +163,7 @@ Every error uses one envelope, `{ code, message, details, hint }`, for example `
 - [ ] **M3a** Departments, skills, projects with status lifecycle (built and tested locally)
 - [ ] **M3b** Date edits with clamp and recheck, deallocation, project/employee/department views (built and tested locally)
 - [ ] **M4a** Notifications (in the trigger's transaction), skill validation, required skill levels (built and tested locally)
-- [ ] **M4b** Endorsements, skill upgrade proposals
+- [ ] **M4b** Endorsements, skill upgrade proposals with a daily, idempotent job (built and tested locally)
 - [ ] **M5** Statistics and seed
 - [ ] **M7** Final polish, architecture notes and walkthrough
 
