@@ -1,8 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Experience, SKILL_LEVELS, type SessionInfo, type SkillsResponse } from '@team-finder/domain';
+import {
+  Experience,
+  SKILL_LEVELS,
+  type SessionInfo,
+  type SkillsResponse,
+  type UpgradeProposalView,
+} from '@team-finder/domain';
 import { useState } from 'react';
 import { api, toErrorMessage } from '../lib/api.ts';
 import { useAnnounce } from '../lib/announce.tsx';
+import { MyEvidence } from './Endorsements.tsx';
 import { OrgTabs } from './OrgTabs.tsx';
 
 // Skill-01/02 (M3a). Everyone keeps their own skills (they feed the matching engine); department
@@ -23,7 +30,8 @@ export function SkillsPage({ session }: { session: SessionInfo }) {
       </header>
       <main className="org-page">
         {skills.isError && <p role="alert">{toErrorMessage(skills.error)}</p>}
-        {skills.data && <MySkills data={skills.data} />}
+        <Suggested />
+        {skills.data && <MySkills data={skills.data} userId={session.user.id} />}
         {skills.data && <Catalog data={skills.data} />}
       </main>
     </>
@@ -38,7 +46,91 @@ function useRefresh() {
   };
 }
 
-function MySkills({ data }: { data: SkillsResponse }) {
+/** Project-11: skills the upgrade job suggests after another 3 months on a project. */
+function Suggested() {
+  const proposals = useQuery({ queryKey: ['upgrade-proposals'], queryFn: api.upgradeProposals });
+  if (!proposals.data || proposals.data.proposals.length === 0) return null;
+  return (
+    <section className="org-section note" aria-labelledby="suggested-title" data-testid="suggested-skills">
+      <h2 id="suggested-title">Suggested for you</h2>
+      <p className="muted">From your time on projects that use these skills. Adding one sends it for validation.</p>
+      <ul className="plain-list">
+        {proposals.data.proposals.map((p) => (
+          <SuggestionRow key={p.id} p={p} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function SuggestionRow({ p }: { p: UpgradeProposalView }) {
+  const queryClient = useQueryClient();
+  const announce = useAnnounce();
+  const [level, setLevel] = useState(Math.max(p.minLevel ?? 2, p.current ? p.current.level : 1));
+  const [experience, setExperience] = useState<Experience>(p.current?.experience ?? '0-6m');
+  const done = () => {
+    void queryClient.invalidateQueries({ queryKey: ['upgrade-proposals'] });
+    void queryClient.invalidateQueries({ queryKey: ['skills'] });
+  };
+  const accept = useMutation({
+    mutationFn: () => api.acceptUpgrade(p.id, level, experience),
+    onSuccess: () => {
+      announce(`${p.skill.name} added; waiting for validation.`);
+      done();
+    },
+  });
+  const dismiss = useMutation({
+    mutationFn: () => api.dismissUpgrade(p.id),
+    onSuccess: () => {
+      announce(`Suggestion for ${p.skill.name} dismissed.`);
+      done();
+    },
+  });
+  const busy = accept.isPending || dismiss.isPending;
+  return (
+    <li className="team-role" data-testid={`suggestion-${p.skill.name}`}>
+      <span className="team-role-name">
+        {p.skill.name}{' '}
+        <span className="muted">
+          · from {p.project.name}
+          {p.minLevel ? `, needs level ${p.minLevel}+` : ''}
+          {p.current ? `, you have level ${p.current.level}` : ''}
+        </span>
+      </span>
+      <select aria-label={`Level in ${p.skill.name}`} value={level} onChange={(e) => setLevel(Number(e.target.value))}>
+        {SKILL_LEVELS.map((l, i) => (
+          <option key={l} value={i + 1}>
+            {i + 1} {l}
+          </option>
+        ))}
+      </select>
+      <select
+        aria-label={`Experience with ${p.skill.name}`}
+        value={experience}
+        onChange={(e) => setExperience(e.target.value as Experience)}
+      >
+        {EXPERIENCES.map((x) => (
+          <option key={x}>{x}</option>
+        ))}
+      </select>
+      <span className="team-role-actions actions">
+        <button type="button" className="btn btn-small btn-primary" disabled={busy} onClick={() => accept.mutate()}>
+          Add {p.skill.name}
+        </button>
+        <button type="button" className="btn btn-small btn-ghost" disabled={busy} onClick={() => dismiss.mutate()}>
+          Dismiss
+        </button>
+      </span>
+      {(accept.error ?? dismiss.error) && (
+        <p role="alert" className="inline-error">
+          {toErrorMessage(accept.error ?? dismiss.error)}
+        </p>
+      )}
+    </li>
+  );
+}
+
+function MySkills({ data, userId }: { data: SkillsResponse; userId: string }) {
   const announce = useAnnounce();
   const refresh = useRefresh();
   const name = (id: string) => data.skills.find((s) => s.id === id)?.name ?? 'Skill';
@@ -111,6 +203,7 @@ function MySkills({ data }: { data: SkillsResponse }) {
                 Remove
               </button>
             </span>
+            <MyEvidence userId={userId} skillId={m.skillId} skillName={name(m.skillId)} items={m.endorsements} />
           </li>
         ))}
       </ul>

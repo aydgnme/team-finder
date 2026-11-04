@@ -3,6 +3,7 @@ import { SKILL_LEVELS, type SkillClaimItem } from '@team-finder/domain';
 import { useState } from 'react';
 import { api, errorCode, toErrorMessage } from '../lib/api.ts';
 import { useAnnounce } from '../lib/announce.tsx';
+import { EndorsementList } from './Endorsements.tsx';
 
 // Skill-04: claims waiting for validation. The department manager sees their people's claims in
 // Approvals; admins see claims nobody else can validate on the Organization screen.
@@ -78,6 +79,7 @@ export function SkillClaims({ claims, title }: { claims: SkillClaimItem[]; title
                   Reject
                 </button>
               </span>
+              <EndorsementList items={c.endorsements} skillName={`${c.user.name}'s ${c.skill.name}`} />
               {rowError[c.userSkillId] && (
                 <p className="row-error" role="alert">
                   {rowError[c.userSkillId]}
