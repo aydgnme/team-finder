@@ -47,3 +47,5 @@ One PR: the statistics are small, and the seed is data plus guard tests.
 - `skillStats()` on fixtures: validated only, buckets, sort, the "no validated skill" count.
 - The route: Dana for Engineering, an admin for any department, 403 for other managers and employees, 404 across orgs (isolation suite).
 - e2e: Dana opens Engineering's stats, reads a number from the table, and switches the selected skill.
+
+**Deviation (build):** the pie charts became ranked bars with a level split beneath each one. A pie of holders per skill would be wrong, because people hold several skills, so the slices are not parts of one whole. A pie per skill would make the reader compare angles across six charts. Bars on one baseline answer both questions, and the table carries every number.
