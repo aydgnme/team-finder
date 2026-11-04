@@ -172,6 +172,20 @@ describe('Project-11 upgrade job', () => {
         await call(app, ana, 'POST', `/api/me/upgrade-proposals/${react.id}/accept`, { level: 2, experience: '6-12m' }),
       ),
     ).toBe('CONFLICT_STALE');
+    // A suggestion whose skill has since been deleted is no longer listed.
+    const ines = await d.as('Ines');
+    await database.db.collection('skillUpgradeProposals').insertOne({
+      _id: 'gone-skill' as never,
+      orgId: d.orgId,
+      userId: d.person('Ines'),
+      skillId: 'deleted-skill',
+      projectId: d.project('Cobalt'),
+      minLevel: null,
+      status: 'open',
+      createdAt: NOW,
+      decidedAt: null,
+    });
+    expect(await d.proposals(ines)).toEqual([]);
     // Somebody else's suggestion does not exist for you.
     expect(code(await call(app, dana, 'POST', `/api/me/upgrade-proposals/${react.id}/dismiss`, {}))).toBe('NOT_FOUND');
   });

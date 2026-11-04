@@ -164,17 +164,20 @@ export async function listMyProposals({ repo, actor }: ServiceContext): Promise<
   const projectName = new Map(projects.map((p) => [p._id, p.name]));
   const mine = new Map(held.map((h) => [h.skillId, h]));
   return {
-    proposals: open.map((p) => {
-      const h = mine.get(p.skillId);
-      return {
-        id: p._id,
-        skill: { id: p.skillId, name: skillName.get(p.skillId) ?? 'Skill' },
-        project: { id: p.projectId, name: projectName.get(p.projectId) ?? 'a project' },
-        minLevel: p.minLevel,
-        current: h ? { level: h.level, experience: h.experience, validated: h.validated } : null,
-        createdAt: p.createdAt.toISOString(),
-      };
-    }),
+    // A suggestion whose skill was deleted since (projects can drop it) is no longer actionable.
+    proposals: open
+      .filter((p) => skillName.has(p.skillId))
+      .map((p) => {
+        const h = mine.get(p.skillId);
+        return {
+          id: p._id,
+          skill: { id: p.skillId, name: skillName.get(p.skillId)! },
+          project: { id: p.projectId, name: projectName.get(p.projectId) ?? 'a project' },
+          minLevel: p.minLevel,
+          current: h ? { level: h.level, experience: h.experience, validated: h.validated } : null,
+          createdAt: p.createdAt.toISOString(),
+        };
+      }),
   };
 }
 
