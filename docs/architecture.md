@@ -49,3 +49,9 @@ Committing a draft re-runs every check inside one transaction: the start move (w
 Routes never see the database driver. `orgRepo(actor)` wraps every tenant collection and injects `orgId` into each filter, insert and update, so a query cannot forget it. An ESLint `no-restricted-imports` rule forbids importing `mongodb` outside `apps/api/src/db`, and `apps/api/test/lint-rule.test.ts` checks the rule fires. Ids from another org therefore behave like ids that do not exist (`404`), and permission checks (`can()` in `packages/domain`) run on top for the actor's own org.
 
 **Tests:** `apps/api/test/org-repo.test.ts` (the wrapper itself) and `apps/api/test/isolation.test.ts`, which builds two real orgs and two demo sandboxes, calls every id-taking route as a member of another org with the victim's ids, expects `403`/`404` for each, and compares a SHA-256 fingerprint of all the victim's documents before and after.
+
+## Notifications
+
+A notification is written by `notify()` (`apps/api/src/services/notifications.ts`) inside the transaction of the action that caused it: proposing (including scenario and AI commits), asking to end an assignment, deciding either, claiming or raising a skill, and deleting a project. A refused or rolled-back action therefore leaves no notification behind, and a replayed transaction writes exactly one. The recipient is resolved when the action happens (the person's department manager at that moment, or whoever proposed). Nobody is notified about their own action. `data` keeps the names a notification needs, so it still reads correctly after the project is deleted. Notifications are a tenant collection like any other: orgRepo scopes them, demo sandboxes expire them, and the isolation suite checks that another org's ids can be neither read nor marked read.
+
+**Tests:** `apps/api/test/m4a.test.ts` (every trigger, no self-notifications, a refused approval and a failed scenario commit write nothing), `e2e/inbox.spec.ts`.

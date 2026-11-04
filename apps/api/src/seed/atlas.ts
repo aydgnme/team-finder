@@ -3,6 +3,7 @@ import { newId } from '../db/org-repo.ts';
 import type {
   AssignmentDoc,
   DepartmentDoc,
+  NotificationDoc,
   ProjectDoc,
   SkillCategoryDoc,
   SkillDoc,
@@ -39,6 +40,7 @@ export interface SeedData {
   userSkills: Seedless<UserSkillDoc>[];
   projects: Seedless<ProjectDoc>[];
   assignments: Seedless<AssignmentDoc>[];
+  notifications: Seedless<NotificationDoc>[];
 }
 
 const SKILLS = {
@@ -213,8 +215,22 @@ export function atlasSeed(today: string, now: Date = new Date()): SeedData {
       level,
       experience,
       validated: true,
+      previous: null,
+      version: 0,
     })),
   );
+  // Skill-04: one claim waiting for Dana, so the validation flow is visible on first visit.
+  const pendingClaim: Seedless<UserSkillDoc> = {
+    _id: newId(),
+    userId: userId.jo,
+    skillId: skillId.go,
+    level: 2,
+    experience: '6-12m',
+    validated: false,
+    previous: null,
+    version: 0,
+  };
+  userSkills.push(pendingClaim);
 
   const project = (
     key: keyof typeof projectId,
@@ -335,6 +351,44 @@ export function atlasSeed(today: string, now: Date = new Date()): SeedData {
     assignment('tom', 'helios', 'backend', 'past', 8, ...helios),
   ];
 
+  // Notification-01: what the seed's pending items would have sent (Dana's inbox is not empty).
+  const notification = (
+    type: NotificationDoc['type'],
+    refId: string,
+    actorId: string | null,
+    data: NotificationDoc['data'],
+    minutesAgo: number,
+  ): Seedless<NotificationDoc> => ({
+    _id: newId(),
+    userId: userId.dana,
+    type,
+    refId,
+    actorId,
+    data,
+    createdAt: new Date(now.getTime() - minutesAgo * 60_000),
+    readAt: null,
+  });
+  const proposedOn = (who: PersonKey) =>
+    assignments.find((a) => a.userId === userId[who] && a.projectId === projectId.atlas && a.status === 'proposed')!;
+  const notifications = [
+    notification(
+      'skillPendingValidation',
+      pendingClaim._id,
+      userId.jo,
+      { personName: PEOPLE.jo.name, skillName: SKILLS.go[0] },
+      30,
+    ),
+    ...(['leo', 'kai'] as const).map((who, i) =>
+      notification(
+        'assignmentProposed',
+        proposedOn(who)._id,
+        userId.pat,
+        { personName: PEOPLE[who].name, projectId: projectId.atlas, projectName: 'Atlas' },
+        60 + i,
+      ),
+    ),
+  ];
+
   return {
     orgName: 'Northwind Labs',
     landingProjectId: projectId.atlas,
@@ -357,5 +411,6 @@ export function atlasSeed(today: string, now: Date = new Date()): SeedData {
     userSkills,
     projects,
     assignments,
+    notifications,
   };
 }

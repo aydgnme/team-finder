@@ -1,4 +1,4 @@
-import type { AccessRole, AssignmentStatus, Experience } from '@team-finder/domain';
+import type { AccessRole, AssignmentStatus, Experience, NotificationData, NotificationType } from '@team-finder/domain';
 
 // Stored document shapes. Ids are strings (ObjectId hex) so services never need the mongodb package.
 // Every tenant document carries `orgId`; demo sandboxes also carry `expiresAt` (TTL cleanup).
@@ -70,7 +70,12 @@ export interface UserSkillDoc extends TenantDoc {
   skillId: string;
   level: number;
   experience: Experience;
+  /** Skill-04: self-assigned skills and raises count only once their department manager validates them. */
   validated: boolean;
+  /** The validated values a pending raise replaces; rejecting the raise restores them. */
+  previous?: { level: number; experience: Experience } | null;
+  /** Bumped by every change, so a validation never decides on values it did not see. */
+  version?: number;
 }
 
 export type ProjectStatus = 'notStarted' | 'starting' | 'inProgress' | 'closing' | 'closed';
@@ -111,6 +116,17 @@ export interface AssignmentDoc extends TenantDoc {
   decidedAt?: Date;
 }
 
+export interface NotificationDoc extends TenantDoc {
+  userId: string;
+  type: NotificationType;
+  /** What it is about: an assignment, a user skill or a project id. */
+  refId: string;
+  actorId: string | null;
+  data: NotificationData;
+  createdAt: Date;
+  readAt: Date | null;
+}
+
 export interface SessionDoc {
   _id: string;
   orgId: string;
@@ -130,6 +146,7 @@ export interface TenantCollections {
   userSkills: UserSkillDoc;
   projects: ProjectDoc;
   assignments: AssignmentDoc;
+  notifications: NotificationDoc;
 }
 export type TenantCollectionName = keyof TenantCollections;
 export const TENANT_COLLECTIONS = [
@@ -141,4 +158,5 @@ export const TENANT_COLLECTIONS = [
   'userSkills',
   'projects',
   'assignments',
+  'notifications',
 ] as const satisfies TenantCollectionName[];

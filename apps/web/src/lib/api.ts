@@ -1,5 +1,11 @@
 import {
   AiDraftResponse,
+  MarkReadResponse,
+  MySkill,
+  NotificationsResponse,
+  SkillClaimResult,
+  UnreadCountResponse,
+  type MarkReadRequest,
   RaceResult,
   DepartmentProjects,
   NoApproverResponse,
@@ -190,7 +196,7 @@ export const api = {
     request(Ok, `/api/skills/${encodeURIComponent(id)}`, { method: 'PUT', body }),
   deleteSkill: (id: string) => request(Ok, `/api/skills/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   setMySkill: (skillId: string, level: number, experience: Experience) =>
-    request(Ok, `/api/me/skills/${encodeURIComponent(skillId)}`, { method: 'PUT', body: { level, experience } }),
+    request(MySkill, `/api/me/skills/${encodeURIComponent(skillId)}`, { method: 'PUT', body: { level, experience } }),
   removeMySkill: (skillId: string) =>
     request(Ok, `/api/me/skills/${encodeURIComponent(skillId)}`, { method: 'DELETE' }),
   projectDetails: (id: string) => request(ProjectDetails, `/api/projects/${encodeURIComponent(id)}/details`),
@@ -207,6 +213,14 @@ export const api = {
       body: { version, reason },
     }),
   race: () => request(RaceResult, '/api/demo/race', { method: 'POST' }),
+  notifications: () => request(NotificationsResponse, '/api/notifications'),
+  unreadCount: () => request(UnreadCountResponse, '/api/notifications/unread-count'),
+  markRead: (body: MarkReadRequest) => request(MarkReadResponse, '/api/notifications/read', { method: 'POST', body }),
+  decideClaim: (id: string, version: number, outcome: 'validate' | 'reject') =>
+    request(SkillClaimResult, `/api/skills/claims/${encodeURIComponent(id)}/${outcome}`, {
+      method: 'POST',
+      body: { version },
+    }),
   aiStatus: () => request(AiStatus, '/api/ai/status'),
   aiSearch: (body: AiSearchRequest) => request(AiDraftResponse, '/api/ai/search', { method: 'POST', body }),
 };

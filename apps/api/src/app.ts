@@ -9,6 +9,7 @@ import type { DraftProvider } from './ai/provider.ts';
 import { aiRoutes } from './routes/ai.ts';
 import { authRoutes } from './routes/auth.ts';
 import { demoRoutes } from './routes/demo.ts';
+import { notificationRoutes } from './routes/notifications.ts';
 import { orgRoutes } from './routes/org.ts';
 import { raceRoutes } from './routes/race.ts';
 import { structureRoutes } from './routes/structure.ts';
@@ -125,6 +126,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
   });
   orgRoutes(app, deps, { mutations });
   structureRoutes(app, deps, { mutations });
+  notificationRoutes(app, deps);
   raceRoutes(app, deps, { enabled: options.demoRoutesEnabled ?? true, perSession: createLimiter(rl.racePerSession) });
   aiRoutes(app, deps, {
     provider: options.aiProvider ?? null,

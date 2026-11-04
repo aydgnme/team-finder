@@ -17,9 +17,10 @@ import type { z } from 'zod';
 import type { AssignmentDoc, ProjectDoc } from '../db/documents.ts';
 import type { DbSession, OrgRepo } from '../db/org-repo.ts';
 import { invalid } from './assignments.ts';
+import { notify } from './notifications.ts';
 import type { ServiceContext } from './context.ts';
 import { touchReferences } from './references.ts';
-import { groupBy, loadProject, touchProject, unique } from './shared.ts';
+import { approverOf, groupBy, loadProject, touchProject, unique } from './shared.ts';
 
 // Project-01 and the project lifecycle (docs/plans/m3-organization-data.md, M3a).
 
@@ -53,6 +54,7 @@ export async function summaries(ctx: ServiceContext, projects: ProjectDoc[]): Pr
     pm: { id: p.pmId, name: pmName.get(p.pmId) ?? 'Unknown' },
     techStack: p.techStack,
     teamRoles: p.teamRoles,
+    skillRequirements: p.skillRequirements.map((r) => ({ skillId: r.skillId, minLevel: r.minLevel ?? 1 })),
     slots: { filled: filled.get(p._id)?.length ?? 0, total: p.teamRoles.reduce((n, r) => n + r.count, 0) },
     canEdit: can(actor, 'project.edit', { orgId: p.orgId, pmId: p.pmId }),
   }));
@@ -83,7 +85,7 @@ export async function createProject(ctx: ServiceContext, input: z.output<typeof 
   const id = await repo.withTransaction(async (session) => {
     await touchReferences(repo, session, {
       teamRoleIds: input.teamRoles.map((r) => r.roleId),
-      skillIds: input.techStack,
+      skillIds: [...input.techStack, ...input.skillRequirements.map((r) => r.skillId)],
     });
     const doc = await repo.projects.insertOne(
       {
@@ -96,7 +98,7 @@ export async function createProject(ctx: ServiceContext, input: z.output<typeof 
         everActive: false,
         techStack: unique(input.techStack),
         teamRoles: input.teamRoles,
-        skillRequirements: [],
+        skillRequirements: input.skillRequirements,
         pmId: actor.userId,
         version: 0,
       },
@@ -148,7 +150,10 @@ export async function updateProject(
     }
     await touchReferences(repo, session, {
       teamRoleIds: input.teamRoles?.map((r) => r.roleId),
-      skillIds: input.techStack,
+      skillIds:
+        input.techStack || input.skillRequirements
+          ? [...(input.techStack ?? []), ...(input.skillRequirements ?? []).map((r) => r.skillId)]
+          : undefined,
     });
     await repo.projects.updateOne(
       { _id: project._id },
@@ -158,6 +163,7 @@ export async function updateProject(
           ...(input.description !== undefined ? { description: input.description } : {}),
           ...(input.techStack !== undefined ? { techStack: unique(input.techStack) } : {}),
           ...(input.teamRoles !== undefined ? { teamRoles: input.teamRoles } : {}),
+          ...(input.skillRequirements !== undefined ? { skillRequirements: input.skillRequirements } : {}),
           startDate,
           deadline,
         },
@@ -316,6 +322,25 @@ export async function deleteProject(ctx: ServiceContext, projectId: string) {
         { session },
       );
     }
+    // projectDeleted: once per department manager whose people were on it (any status).
+    const all = await repo.assignments.find({ projectId: project._id }, { session, projection: { userId: 1 } });
+    const people = await repo.users.find(
+      { _id: { $in: unique(all.map((a) => a.userId)) } },
+      { session, projection: { departmentId: 1 } },
+    );
+    const approvers = unique(
+      (await Promise.all(people.map((u) => approverOf(repo, u, session)))).filter((id): id is string => id !== null),
+    );
+    await notify(
+      ctx,
+      session,
+      approvers.map((userId) => ({
+        userId,
+        type: 'projectDeleted' as const,
+        refId: project._id,
+        data: { projectName: project.name },
+      })),
+    );
     await repo.assignments.deleteMany({ projectId: project._id }, { session });
     await repo.projects.deleteMany({ _id: project._id }, { session });
   });

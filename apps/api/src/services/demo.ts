@@ -32,6 +32,7 @@ export async function createSandbox(database: Database, store: SessionStore, now
     repo.userSkills.insertMany(seed.userSkills),
     repo.projects.insertMany(seed.projects),
     repo.assignments.insertMany(seed.assignments),
+    repo.notifications.insertMany(seed.notifications),
   ]);
   return { orgId, expiresAt, pmUserId: seed.pmUserId };
 }

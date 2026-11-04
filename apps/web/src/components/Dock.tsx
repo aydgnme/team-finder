@@ -5,6 +5,7 @@ import { useAnnounce } from '../lib/announce.tsx';
 import { coach, useCoach } from '../lib/coach.ts';
 import { firstName } from '../lib/format.ts';
 import { href, navigate, useRoute } from '../lib/route.ts';
+import { useUnreadCount } from './InboxPage.tsx';
 
 export function useSwitchPersona() {
   const queryClient = useQueryClient();
@@ -43,7 +44,8 @@ export function Dock({
     refetchInterval: 30_000,
   });
   const manager = session.personas.find((p) => p.roles.includes('deptManager'));
-  const pending = approvals.data?.items.length;
+  const pending = approvals.data ? approvals.data.items.length + approvals.data.skillClaims.length : undefined;
+  const unread = useUnreadCount(session).data?.unread;
 
   return (
     <footer className="dock">
@@ -75,6 +77,15 @@ export function Dock({
         </a>
         <a href={href.approvals()} aria-current={route.name === 'approvals' ? 'page' : undefined}>
           Approvals{isManager && pending !== undefined ? <span className="badge mono">{pending}</span> : null}
+        </a>
+        <a href={href.inbox()} aria-current={route.name === 'inbox' ? 'page' : undefined}>
+          Inbox
+          {unread ? (
+            <span className="badge mono" data-testid="unread-badge">
+              {unread}
+              <span className="sr-only"> unread</span>
+            </span>
+          ) : null}
         </a>
         <a href={href.org()} aria-current={['org', 'departments', 'skills'].includes(route.name) ? 'page' : undefined}>
           Organization

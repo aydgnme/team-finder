@@ -6,6 +6,7 @@ import { useAnnounce } from '../lib/announce.tsx';
 import { coach } from '../lib/coach.ts';
 import { firstName, formatDay } from '../lib/format.ts';
 import { href } from '../lib/route.ts';
+import { SkillClaims } from '../components/SkillClaims.tsx';
 
 export function ApprovalsInbox({ session }: { session: SessionInfo }) {
   const queryClient = useQueryClient();
@@ -95,90 +96,93 @@ export function ApprovalsInbox({ session }: { session: SessionInfo }) {
             </button>
           </div>
         )}
-        {approvals.data && approvals.data.items.length === 0 && (
-          <p className="empty">Nothing waiting. Proposals for your department show up here.</p>
+        {approvals.data && approvals.data.items.length === 0 && approvals.data.skillClaims.length === 0 && (
+          <p className="empty">Nothing waiting. Proposals and skill claims for your department show up here.</p>
         )}
         {approvals.data && approvals.data.items.length > 0 && (
-          <table className="table">
-            <thead>
-              <tr>
-                <th scope="col">Person</th>
-                <th scope="col">Project · role</th>
-                <th scope="col">Hours/day</th>
-                <th scope="col">From</th>
-                <th scope="col">Capacity check</th>
-                <th scope="col">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {approvals.data.items.map((item) => {
-                const busy = decide.isPending && decide.variables?.item.assignmentId === item.assignmentId;
-                return (
-                  <tr key={item.assignmentId} data-testid={`approval-${item.user.name}`}>
-                    <th scope="row">{item.user.name}</th>
-                    <td>
-                      {item.kind === 'deallocation' && <strong className="block">Ends their assignment</strong>}
-                      {item.project.name} · {item.slotRole.name}
-                      {item.reason && <span className="muted block">Reason: “{item.reason}”</span>}
-                      {item.comment && <span className="muted block">“{item.comment}”</span>}
-                    </td>
-                    <td className="mono">{item.hoursPerDay}</td>
-                    <td className="mono">{formatDay(item.from)}</td>
-                    <td>
-                      {!item.check ? (
-                        <span className="ok">Frees {item.hoursPerDay} h/day</span>
-                      ) : item.check.fits ? (
-                        <span className="ok">✓ Fits</span>
-                      ) : (
-                        <span className="warn">
-                          ⚠ {item.check.worst.used} h booked on {formatDay(item.check.worst.date)}, max{' '}
-                          {item.check.maxHours} h
-                        </span>
-                      )}
-                      {rowError[item.assignmentId] && (
-                        <p className="row-error" role="alert" data-testid="approval-error">
-                          {rowError[item.assignmentId]}
-                        </p>
-                      )}
-                    </td>
-                    <td>
-                      <div className="actions">
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-small"
-                          disabled={busy}
-                          onClick={() => decide.mutate({ item, action: 'approve' })}
-                          aria-label={
-                            item.kind === 'deallocation'
-                              ? `Approve ending ${item.user.name} on ${item.project.name}`
-                              : `Approve ${item.user.name} for ${item.project.name}`
-                          }
-                        >
-                          Approve
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-small"
-                          disabled={busy}
-                          onClick={() => decide.mutate({ item, action: 'reject' })}
-                          aria-label={
-                            item.kind === 'deallocation'
-                              ? `Keep ${item.user.name} on ${item.project.name}`
-                              : `Reject ${item.user.name} for ${item.project.name}`
-                          }
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="table-scroll">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th scope="col">Person</th>
+                  <th scope="col">Project · role</th>
+                  <th scope="col">Hours/day</th>
+                  <th scope="col">From</th>
+                  <th scope="col">Capacity check</th>
+                  <th scope="col">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {approvals.data.items.map((item) => {
+                  const busy = decide.isPending && decide.variables?.item.assignmentId === item.assignmentId;
+                  return (
+                    <tr key={item.assignmentId} data-testid={`approval-${item.user.name}`}>
+                      <th scope="row">{item.user.name}</th>
+                      <td>
+                        {item.kind === 'deallocation' && <strong className="block">Ends their assignment</strong>}
+                        {item.project.name} · {item.slotRole.name}
+                        {item.reason && <span className="muted block">Reason: “{item.reason}”</span>}
+                        {item.comment && <span className="muted block">“{item.comment}”</span>}
+                      </td>
+                      <td className="mono">{item.hoursPerDay}</td>
+                      <td className="mono">{formatDay(item.from)}</td>
+                      <td>
+                        {!item.check ? (
+                          <span className="ok">Frees {item.hoursPerDay} h/day</span>
+                        ) : item.check.fits ? (
+                          <span className="ok">✓ Fits</span>
+                        ) : (
+                          <span className="warn">
+                            ⚠ {item.check.worst.used} h booked on {formatDay(item.check.worst.date)}, max{' '}
+                            {item.check.maxHours} h
+                          </span>
+                        )}
+                        {rowError[item.assignmentId] && (
+                          <p className="row-error" role="alert" data-testid="approval-error">
+                            {rowError[item.assignmentId]}
+                          </p>
+                        )}
+                      </td>
+                      <td>
+                        <div className="actions">
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-small"
+                            disabled={busy}
+                            onClick={() => decide.mutate({ item, action: 'approve' })}
+                            aria-label={
+                              item.kind === 'deallocation'
+                                ? `Approve ending ${item.user.name} on ${item.project.name}`
+                                : `Approve ${item.user.name} for ${item.project.name}`
+                            }
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-small"
+                            disabled={busy}
+                            onClick={() => decide.mutate({ item, action: 'reject' })}
+                            aria-label={
+                              item.kind === 'deallocation'
+                                ? `Keep ${item.user.name} on ${item.project.name}`
+                                : `Reject ${item.user.name} for ${item.project.name}`
+                            }
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
+        {approvals.data && <SkillClaims claims={approvals.data.skillClaims} title="Skills to validate" />}
       </main>
     </>
   );

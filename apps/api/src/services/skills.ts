@@ -1,14 +1,24 @@
-import { can, fail, type Experience, type SkillRequest, type SkillsResponse } from '@team-finder/domain';
+import {
+  can,
+  Experience,
+  fail,
+  type SkillClaimItem,
+  type SkillRequest,
+  type SkillsResponse,
+} from '@team-finder/domain';
 import type { z } from 'zod';
 import { duplicateKeyOn } from '../db/auth.ts';
-import type { SkillDoc } from '../db/documents.ts';
+import type { SkillDoc, UserDoc, UserSkillDoc } from '../db/documents.ts';
+import type { DbSession, OrgRepo } from '../db/org-repo.ts';
 import type { ServiceContext } from './context.ts';
+import { notify } from './notifications.ts';
 import { touchReferences } from './references.ts';
-import { unique } from './shared.ts';
+import { approverOf, unique } from './shared.ts';
 
 // Skill-01/02 (docs/plans/m3-organization-data.md, M3a). Department managers and admins create
 // categories and skills; only a skill's author edits or deletes it. Everyone keeps their own
-// skills; until Skill-04 (M4) they count as validated.
+// skills; since Skill-04 (M4a) new claims and raises wait for their department manager, and only
+// validated skills count for matching, coverage and views.
 
 const nameTaken = (name: string) => (error: unknown) => {
   if (duplicateKeyOn(error, 'org_name_unique_ci')) fail('NAME_TAKEN', { name });
@@ -159,7 +169,30 @@ export async function deleteSkill(ctx: ServiceContext, id: string) {
   });
 }
 
-/** Skill-02: add or update one of your own skills. */
+const EXPERIENCE = Experience.options;
+
+/** A change that claims more than was validated: a higher level or longer experience. */
+function isRaise(from: { level: number; experience: Experience }, to: { level: number; experience: Experience }) {
+  return to.level > from.level || EXPERIENCE.indexOf(to.experience) > EXPERIENCE.indexOf(from.experience);
+}
+
+/**
+ * Who validates someone's claims: their department manager now (never stored), but never the
+ * claimer. Null means nobody but an admin can (no department, no manager, or their own claim).
+ */
+export async function validatorOf(
+  repo: OrgRepo,
+  owner: Pick<UserDoc, '_id' | 'departmentId'>,
+  session?: DbSession,
+): Promise<string | null> {
+  const managerId = await approverOf(repo, owner, session);
+  return managerId === owner._id ? null : managerId;
+}
+
+/**
+ * Skill-02 + Skill-04: add or update one of your own skills. A new skill, or a raise of a validated
+ * one, waits for validation (the validated values are kept in `previous`); lowering keeps its state.
+ */
 export async function setMySkill(ctx: ServiceContext, skillId: string, level: number, experience: Experience) {
   const { repo, actor } = ctx;
   if (!can(actor, 'userSkill.edit', { orgId: actor.orgId, userId: actor.userId })) {
@@ -167,19 +200,149 @@ export async function setMySkill(ctx: ServiceContext, skillId: string, level: nu
   }
   return repo.withTransaction(async (session) => {
     await touchReferences(repo, session, { skillIds: [skillId] });
-    const r = await repo.userSkills.updateOne(
-      { userId: actor.userId, skillId },
-      { $set: { level, experience } },
-      { session },
-    );
-    if (r.matchedCount === 0) {
-      // Skill-04 (M4) will create these unvalidated; until then they count right away.
-      await repo.userSkills.insertOne(
-        { userId: actor.userId, skillId, level, experience, validated: true },
+    const current = await repo.userSkills.findOne({ userId: actor.userId, skillId }, { session });
+    const next = { level, experience };
+    let validated: boolean;
+    let id: string;
+    if (!current) {
+      validated = false;
+      id = (
+        await repo.userSkills.insertOne(
+          { userId: actor.userId, skillId, ...next, validated, previous: null, version: 0 },
+          { session },
+        )
+      )._id;
+    } else {
+      id = current._id;
+      // Compare with the last validated values: a pending raise taken back to (or below) them needs no
+      // validation any more, while a raise of a validated skill keeps those values to restore on reject.
+      const base = current.validated ? current : current.previous;
+      const raise = !base || isRaise(base, next);
+      validated = !raise;
+      await repo.userSkills.updateOne(
+        { _id: current._id },
+        {
+          $set: {
+            ...next,
+            validated,
+            previous: !raise
+              ? null
+              : current.validated
+                ? { level: current.level, experience: current.experience }
+                : (current.previous ?? null),
+          },
+          $inc: { version: 1 },
+        },
         { session },
       );
     }
-    return { skillId, level, experience, validated: true };
+    // Ask for validation when the skill becomes pending, not on every edit of a pending claim.
+    if (!validated && (!current || current.validated)) {
+      const [owner, skill] = await Promise.all([
+        repo.users.findOne({ _id: actor.userId }, { session }),
+        repo.skills.findOne({ _id: skillId }, { session, projection: { name: 1 } }),
+      ]);
+      await notify(ctx, session, [
+        {
+          userId: owner ? await validatorOf(repo, owner, session) : null,
+          type: 'skillPendingValidation',
+          refId: id,
+          data: { personName: owner?.name ?? 'Someone', skillName: skill?.name ?? 'a skill' },
+        },
+      ]);
+    }
+    return { skillId, level, experience, validated };
+  });
+}
+
+async function toClaimItems(
+  repo: OrgRepo,
+  claims: UserSkillDoc[],
+  users: Map<string, UserDoc>,
+): Promise<SkillClaimItem[]> {
+  const skills = await repo.skills.find(
+    { _id: { $in: unique(claims.map((c) => c.skillId)) } },
+    { projection: { name: 1 } },
+  );
+  const skillName = new Map(skills.map((s) => [s._id, s.name]));
+  return claims.map((c) => ({
+    userSkillId: c._id,
+    version: c.version ?? 0,
+    user: { id: c.userId, name: users.get(c.userId)?.name ?? 'Unknown' },
+    skill: { id: c.skillId, name: skillName.get(c.skillId) ?? 'Skill' },
+    level: c.level,
+    experience: c.experience,
+    previous: c.previous ? { level: c.previous.level, experience: c.previous.experience } : null,
+  }));
+}
+
+/** Pending claims of the people in the departments the caller manages (never their own). */
+export async function claimsForManager({ repo, actor }: ServiceContext): Promise<SkillClaimItem[]> {
+  const depts = await repo.departments.find({ managerId: actor.userId });
+  if (depts.length === 0) return [];
+  const users = await repo.users.find({ departmentId: { $in: depts.map((d) => d._id) }, _id: { $ne: actor.userId } });
+  const claims = await repo.userSkills.find(
+    { userId: { $in: users.map((u) => u._id) }, validated: false },
+    { sort: { _id: 1 } },
+  );
+  return toClaimItems(repo, claims, new Map(users.map((u) => [u._id, u])));
+}
+
+/** Claims nobody but an admin can validate: no department, an unmanaged one, or a manager's own. */
+export async function strandedClaims({ repo, actor }: ServiceContext): Promise<SkillClaimItem[]> {
+  const claims = await repo.userSkills.find({ validated: false, userId: { $ne: actor.userId } }, { sort: { _id: 1 } });
+  if (claims.length === 0) return [];
+  const users = await repo.users.find({ _id: { $in: unique(claims.map((c) => c.userId)) } });
+  const userById = new Map(users.map((u) => [u._id, u]));
+  const stranded: UserSkillDoc[] = [];
+  for (const c of claims) {
+    const owner = userById.get(c.userId);
+    if (owner && (await validatorOf(repo, owner)) === null) stranded.push(c);
+  }
+  return toClaimItems(repo, stranded, userById);
+}
+
+/** Skill-04: the validator accepts a claim (it starts counting) or rejects it (new: removed; raise: restored). */
+export async function decideClaim(
+  ctx: ServiceContext,
+  userSkillId: string,
+  version: number,
+  outcome: 'validated' | 'rejected',
+) {
+  const { repo, actor } = ctx;
+  return repo.withTransaction(async (session) => {
+    const claim = await repo.userSkills.findOne({ _id: userSkillId }, { session });
+    if (!claim) fail('NOT_FOUND', { resource: 'skill claim', id: userSkillId });
+    const owner = await repo.users.findOne({ _id: claim!.userId }, { session });
+    const validatorId = owner ? await validatorOf(repo, owner, session) : null;
+    if (!can(actor, 'skill.validate', { orgId: repo.orgId, ownerId: claim!.userId, validatorId })) {
+      fail('FORBIDDEN', { action: 'validate this skill' });
+    }
+    if (claim!.validated || (claim!.version ?? 0) !== version) {
+      fail('CONFLICT_STALE', { resource: 'skill claim', id: userSkillId });
+    }
+    // Claims from before Skill-04 carry no version field: match that, or they could never be decided.
+    const guard = {
+      _id: claim!._id,
+      validated: false,
+      ...(claim!.version === undefined ? { version: { $exists: false } } : { version: claim!.version }),
+    };
+    const changed =
+      outcome === 'validated'
+        ? await repo.userSkills.updateOne(
+            guard,
+            { $set: { validated: true, previous: null }, $inc: { version: 1 } },
+            { session },
+          )
+        : claim!.previous
+          ? await repo.userSkills.updateOne(
+              guard,
+              { $set: { ...claim!.previous, validated: true, previous: null }, $inc: { version: 1 } },
+              { session },
+            )
+          : { matchedCount: await repo.userSkills.deleteMany(guard, { session }) };
+    if (changed.matchedCount !== 1) fail('CONFLICT_STALE', { resource: 'skill claim', id: userSkillId });
+    return { userSkillId, outcome };
   });
 }
 

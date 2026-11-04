@@ -76,8 +76,18 @@ test('a new org sets up a department, skills and a project, then staffs it', asy
   await lena.getByLabel('Skill to add').selectOption({ label: 'TypeScript' });
   await lena.getByLabel('Level', { exact: true }).selectOption('4');
   await lena.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(lena.getByTestId('my-skill-TypeScript')).toBeVisible();
+  await expect(lena.getByTestId('my-skill-TypeScript')).toContainText('Pending validation');
   await other.close();
+
+  // Skill-04: the claim counts once Iris (Lena's manager) validates it; her inbox says so.
+  await page.reload();
+  await expect(page.getByTestId('unread-badge')).toContainText('1');
+  await page
+    .getByRole('navigation', { name: 'Screens' })
+    .getByRole('link', { name: /Approvals/ })
+    .click();
+  await page.getByRole('button', { name: "Validate Lena Dev's TypeScript" }).click();
+  await expect(page.getByTestId('live-region')).toHaveText("Lena Dev's TypeScript is validated.");
 
   // Projects: Iris creates Apollo needing one backend developer who knows TypeScript.
   await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Projects' }).click();
@@ -102,7 +112,10 @@ test('a new org sets up a department, skills and a project, then staffs it', asy
     .getByRole('button', { name: /Propose/ })
     .click();
   await expect(page.getByTestId('slot-Backend Developer-1')).toHaveAttribute('data-state', 'pending');
-  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Approvals' }).click();
+  await page
+    .getByRole('navigation', { name: 'Screens' })
+    .getByRole('link', { name: /Approvals/ })
+    .click();
   await page.getByTestId('approval-Lena Dev').getByRole('button', { name: 'Approve Lena Dev for Apollo' }).click();
   await expect(page.getByTestId('approved-banner')).toContainText('Lena Dev added to Apollo.');
 

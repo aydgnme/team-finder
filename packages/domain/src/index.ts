@@ -11,3 +11,4 @@ export * from './ai.ts';
 export * from './auth.ts';
 export * from './projects.ts';
 export * from './race.ts';
+export * from './notifications.ts';
