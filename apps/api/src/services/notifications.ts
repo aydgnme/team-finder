@@ -23,7 +23,7 @@ export interface NewNotification {
 
 /** Writes notifications in the caller's transaction. Never notifies the actor about their own action. */
 export async function notify(
-  ctx: Pick<ServiceContext, 'repo' | 'actor' | 'now'>,
+  ctx: Pick<ServiceContext, 'repo' | 'now'> & { actor: { userId: string } },
   session: DbSession,
   items: readonly NewNotification[],
 ): Promise<void> {
@@ -33,7 +33,8 @@ export async function notify(
       userId: n.userId,
       type: n.type,
       refId: n.refId,
-      actorId: ctx.actor.userId,
+      // Background jobs act as nobody (empty userId): their notifications have no actor.
+      actorId: ctx.actor.userId || null,
       data: n.data,
       createdAt: ctx.now,
       readAt: null,

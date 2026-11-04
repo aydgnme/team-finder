@@ -55,3 +55,19 @@ Routes never see the database driver. `orgRepo(actor)` wraps every tenant collec
 A notification is written by `notify()` (`apps/api/src/services/notifications.ts`) inside the transaction of the action that caused it: proposing (including scenario and AI commits), asking to end an assignment, deciding either, claiming or raising a skill, and deleting a project. A refused or rolled-back action therefore leaves no notification behind, and a replayed transaction writes exactly one. The recipient is resolved when the action happens (the person's department manager at that moment, or whoever proposed). Nobody is notified about their own action. `data` keeps the names a notification needs, so it still reads correctly after the project is deleted. Notifications are a tenant collection like any other: orgRepo scopes them, demo sandboxes expire them, and the isolation suite checks that another org's ids can be neither read nor marked read.
 
 **Tests:** `apps/api/test/m4a.test.ts` (every trigger, no self-notifications, a refused approval and a failed scenario commit write nothing), `e2e/inbox.spec.ts`.
+
+## Skill upgrade job
+
+`runUpgradeJob()` (`apps/api/src/services/upgrades.ts`) runs a minute after boot and then every 24 hours (`UPGRADE_JOB_ENABLED=false` turns it off). It goes through every live org, each through its own orgRepo, so the job obeys tenant isolation like a request does. For each active assignment that has crossed another multiple of 3 months, one transaction:
+
+1. claims the milestone, with an update on `upgradeMilestone` guarded by its previous value;
+2. suggests every project skill the person lacks or holds below the minimum level;
+3. writes each suggestion's notification.
+
+A rerun, a restart or a second instance finds the milestone already claimed and does nothing. A unique partial index on open suggestions per person and skill keeps two assignments from suggesting the same skill twice; if two runs race on it, the loser rolls back and its milestone is retried on the next run. One org failing is logged and does not stop the others.
+
+**Tests:** `apps/api/test/m4b.test.ts`:
+- nothing before 3 months, and the next milestone after a dismissal;
+- a rerun creates nothing, and concurrent runs create each suggestion once;
+- under-level raises;
+- expired sandboxes are skipped.

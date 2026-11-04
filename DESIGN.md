@@ -80,6 +80,10 @@ The staffing canvas is the one hero surface; everything else uses the same token
 
 **Skill claims** — "Skills to validate" under the proposals in Approvals (and "Skills only you can validate" for admins on the Organization screen): one row per claim, "Jo Park · Go · level 2 (Knows), 6-12m", a raise shows "level 3 (…) → level 4 (…) (raise)", with Validate (primary) and Reject. My skills marks unvalidated rows with an amber "Pending validation" pill.
 
+**Suggested for you** — above My skills when the upgrade job has suggestions: a bordered note section, one row per skill, "React · from Atlas" (plus "needs level 3+, you have level 2" for a raise), level and experience selects prefilled from the requirement or your current level, a primary "Add React" and a ghost "Dismiss". The inbox row "Your work on Atlas uses React: add it to your skills?" links here.
+
+**Evidence** — under each of My skills: pills ("Certification · OpenJS Node.js Application Developer ×"), the title a link when there is one, × to remove; an "Add evidence" link opens one inline row (kind, title and optional link, or a select of projects you worked on), Add / Cancel. The same pills, without ×, sit under a claim in "Skills to validate".
+
 **Required skills** — a block in the project form under the tech stack: one row per skill with an "at least N <level>" select and Remove, plus "Add a required skill…". People below a minimum level appear as near misses.
 
 **Dock** — persona switcher ("Viewing as"), Canvas / Projects / Approvals (pending proposals and skill claims for managers) / Inbox (unread) / Organization, org name. Below 768px the links wrap. Coach-marks (max two, dismissible, remembered in localStorage) appear above it.

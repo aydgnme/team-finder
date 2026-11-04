@@ -9,6 +9,8 @@ export interface Config {
   rateLimits: Partial<RateLimits>;
   /** DEMO_ROUTES_ENABLED=false turns off demo-only routes (the race). Default on. */
   demoRoutesEnabled: boolean;
+  /** UPGRADE_JOB_ENABLED=false turns off the daily skill upgrade job (Project-11). Default on. */
+  upgradeJobEnabled: boolean;
   /** AI-01: "anthropic" when LLM_API_KEY is set, "fake" when LLM_PROVIDER=fake, otherwise off. */
   ai: { provider: 'anthropic'; apiKey: string; model: string | undefined } | { provider: 'fake' } | { provider: 'off' };
 }
@@ -53,5 +55,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     },
     ai,
     demoRoutesEnabled: env.DEMO_ROUTES_ENABLED !== 'false',
+    upgradeJobEnabled: env.UPGRADE_JOB_ENABLED !== 'false',
   };
 }

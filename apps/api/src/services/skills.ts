@@ -1,15 +1,19 @@
 import {
+  AddEndorsementRequest,
   can,
   Experience,
   fail,
+  MAX_ENDORSEMENTS,
+  type Endorsement,
+  type MySkill,
   type SkillClaimItem,
   type SkillRequest,
   type SkillsResponse,
 } from '@team-finder/domain';
 import type { z } from 'zod';
 import { duplicateKeyOn } from '../db/auth.ts';
-import type { SkillDoc, UserDoc, UserSkillDoc } from '../db/documents.ts';
-import type { DbSession, OrgRepo } from '../db/org-repo.ts';
+import type { EndorsementDoc, SkillDoc, UserDoc, UserSkillDoc } from '../db/documents.ts';
+import { newId, type DbSession, type OrgRepo } from '../db/org-repo.ts';
 import type { ServiceContext } from './context.ts';
 import { notify } from './notifications.ts';
 import { touchReferences } from './references.ts';
@@ -68,7 +72,13 @@ export async function listSkills(ctx: ServiceContext): Promise<SkillsResponse> {
       inUse: used.has(s._id),
       canEdit: can(actor, 'skill.edit', { orgId: actor.orgId, authorId: s.authorId }),
     })),
-    mine: mine.map((m) => ({ skillId: m.skillId, level: m.level, experience: m.experience, validated: m.validated })),
+    mine: mine.map((m) => ({
+      skillId: m.skillId,
+      level: m.level,
+      experience: m.experience,
+      validated: m.validated,
+      endorsements: (m.endorsements ?? []).map(toEndorsement),
+    })),
   };
 }
 
@@ -194,65 +204,139 @@ export async function validatorOf(
  * one, waits for validation (the validated values are kept in `previous`); lowering keeps its state.
  */
 export async function setMySkill(ctx: ServiceContext, skillId: string, level: number, experience: Experience) {
-  const { repo, actor } = ctx;
+  requireOwnSkills(ctx);
+  return ctx.repo.withTransaction((session) => applyMySkill(ctx, session, skillId, level, experience));
+}
+
+function requireOwnSkills({ actor }: ServiceContext) {
   if (!can(actor, 'userSkill.edit', { orgId: actor.orgId, userId: actor.userId })) {
     fail('FORBIDDEN', { action: 'edit skills' });
   }
+}
+
+/** The body of setMySkill, inside the caller's transaction (also used to accept an upgrade proposal). */
+export async function applyMySkill(
+  ctx: ServiceContext,
+  session: DbSession,
+  skillId: string,
+  level: number,
+  experience: Experience,
+): Promise<MySkill> {
+  const { repo, actor } = ctx;
+  await touchReferences(repo, session, { skillIds: [skillId] });
+  const current = await repo.userSkills.findOne({ userId: actor.userId, skillId }, { session });
+  const next = { level, experience };
+  let validated: boolean;
+  let id: string;
+  if (!current) {
+    validated = false;
+    id = (
+      await repo.userSkills.insertOne(
+        { userId: actor.userId, skillId, ...next, validated, previous: null, version: 0 },
+        { session },
+      )
+    )._id;
+  } else {
+    id = current._id;
+    // Compare with the last validated values: a pending raise taken back to (or below) them needs no
+    // validation any more, while a raise of a validated skill keeps those values to restore on reject.
+    const base = current.validated ? current : current.previous;
+    const raise = !base || isRaise(base, next);
+    validated = !raise;
+    await repo.userSkills.updateOne(
+      { _id: current._id },
+      {
+        $set: {
+          ...next,
+          validated,
+          previous: !raise
+            ? null
+            : current.validated
+              ? { level: current.level, experience: current.experience }
+              : (current.previous ?? null),
+        },
+        $inc: { version: 1 },
+      },
+      { session },
+    );
+  }
+  // Ask for validation when the skill becomes pending, not on every edit of a pending claim.
+  if (!validated && (!current || current.validated)) {
+    const [owner, skill] = await Promise.all([
+      repo.users.findOne({ _id: actor.userId }, { session }),
+      repo.skills.findOne({ _id: skillId }, { session, projection: { name: 1 } }),
+    ]);
+    await notify(ctx, session, [
+      {
+        userId: owner ? await validatorOf(repo, owner, session) : null,
+        type: 'skillPendingValidation',
+        refId: id,
+        data: { personName: owner?.name ?? 'Someone', skillName: skill?.name ?? 'a skill' },
+      },
+    ]);
+  }
+  return { skillId, level, experience, validated, endorsements: current?.endorsements ?? [] };
+}
+
+/** Skill-03: attach evidence to one of your own skills. Project endorsements name a project you worked on. */
+export async function addEndorsement(
+  ctx: ServiceContext,
+  skillId: string,
+  input: z.output<typeof AddEndorsementRequest>,
+) {
+  requireOwnSkills(ctx);
+  const { repo, actor } = ctx;
   return repo.withTransaction(async (session) => {
-    await touchReferences(repo, session, { skillIds: [skillId] });
-    const current = await repo.userSkills.findOne({ userId: actor.userId, skillId }, { session });
-    const next = { level, experience };
-    let validated: boolean;
-    let id: string;
-    if (!current) {
-      validated = false;
-      id = (
-        await repo.userSkills.insertOne(
-          { userId: actor.userId, skillId, ...next, validated, previous: null, version: 0 },
-          { session },
-        )
-      )._id;
-    } else {
-      id = current._id;
-      // Compare with the last validated values: a pending raise taken back to (or below) them needs no
-      // validation any more, while a raise of a validated skill keeps those values to restore on reject.
-      const base = current.validated ? current : current.previous;
-      const raise = !base || isRaise(base, next);
-      validated = !raise;
-      await repo.userSkills.updateOne(
-        { _id: current._id },
+    const mine = await repo.userSkills.findOne({ userId: actor.userId, skillId }, { session });
+    if (!mine) fail('NOT_FOUND', { resource: 'skill', id: skillId });
+    const list = mine!.endorsements ?? [];
+    if (list.length >= MAX_ENDORSEMENTS) {
+      fail('VALIDATION', { issues: [{ path: 'endorsements', message: `at most ${MAX_ENDORSEMENTS} per skill` }] });
+    }
+    let endorsement: EndorsementDoc;
+    if (input.kind === 'project') {
+      const worked = await repo.assignments.findOne(
         {
-          $set: {
-            ...next,
-            validated,
-            previous: !raise
-              ? null
-              : current.validated
-                ? { level: current.level, experience: current.experience }
-                : (current.previous ?? null),
-          },
-          $inc: { version: 1 },
+          userId: actor.userId,
+          projectId: input.projectId,
+          status: { $in: ['active', 'deallocationProposed', 'past'] },
         },
         { session },
       );
+      const project = worked ? await repo.projects.findOne({ _id: input.projectId }, { session }) : null;
+      if (!project) {
+        fail('VALIDATION', { issues: [{ path: 'projectId', message: 'only projects you worked on' }] });
+      }
+      if (list.some((e) => e.projectId === input.projectId)) {
+        fail('VALIDATION', { issues: [{ path: 'projectId', message: 'this project is already listed' }] });
+      }
+      endorsement = { id: newId(), kind: 'project', title: project!.name, url: null, projectId: project!._id };
+    } else {
+      endorsement = { id: newId(), kind: input.kind, title: input.title, url: input.url, projectId: null };
     }
-    // Ask for validation when the skill becomes pending, not on every edit of a pending claim.
-    if (!validated && (!current || current.validated)) {
-      const [owner, skill] = await Promise.all([
-        repo.users.findOne({ _id: actor.userId }, { session }),
-        repo.skills.findOne({ _id: skillId }, { session, projection: { name: 1 } }),
-      ]);
-      await notify(ctx, session, [
-        {
-          userId: owner ? await validatorOf(repo, owner, session) : null,
-          type: 'skillPendingValidation',
-          refId: id,
-          data: { personName: owner?.name ?? 'Someone', skillName: skill?.name ?? 'a skill' },
-        },
-      ]);
-    }
-    return { skillId, level, experience, validated };
+    // Evidence changes what a manager would decide on: bump the version like any edit.
+    await repo.userSkills.updateOne(
+      { _id: mine!._id },
+      { $push: { endorsements: endorsement }, $inc: { version: 1 } },
+      { session },
+    );
+    return toEndorsement(endorsement);
   });
+}
+
+export async function removeEndorsement(ctx: ServiceContext, skillId: string, endorsementId: string) {
+  requireOwnSkills(ctx);
+  const { repo, actor } = ctx;
+  const r = await repo.userSkills.updateOne(
+    { userId: actor.userId, skillId, 'endorsements.id': endorsementId },
+    { $pull: { endorsements: { id: endorsementId } }, $inc: { version: 1 } },
+  );
+  if (r.matchedCount === 0) fail('NOT_FOUND', { resource: 'endorsement', id: endorsementId });
+  return { id: endorsementId };
+}
+
+function toEndorsement(e: EndorsementDoc): Endorsement {
+  return { id: e.id, kind: e.kind, title: e.title, url: e.url, projectId: e.projectId };
 }
 
 async function toClaimItems(
@@ -273,6 +357,7 @@ async function toClaimItems(
     level: c.level,
     experience: c.experience,
     previous: c.previous ? { level: c.previous.level, experience: c.previous.experience } : null,
+    endorsements: (c.endorsements ?? []).map(toEndorsement),
   }));
 }
 

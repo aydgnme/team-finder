@@ -65,7 +65,7 @@ export function describeNotification(n: Pick<NotificationItem, 'type' | 'data' |
     case 'skillPendingValidation':
       return `${d.personName ?? 'Someone'} claimed ${d.skillName ?? 'a skill'}; it needs your validation.`;
     case 'skillUpgradeProposal':
-      return `Your work on ${d.projectName ?? 'a project'} suggests adding ${d.skillName ?? 'a skill'}.`;
+      return `Your work on ${d.projectName ?? 'a project'} uses ${d.skillName ?? 'a skill'}: add it to your skills?`;
     case 'projectDeleted':
       return `${who} deleted ${d.projectName ?? 'a project'}; its proposals for your people are gone.`;
   }

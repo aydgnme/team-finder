@@ -1,4 +1,6 @@
 import {
+  AcceptUpgradeRequest,
+  AddEndorsementRequest,
   CategoryRequest,
   DeallocateRequest,
   CreateProjectRequest,
@@ -18,6 +20,7 @@ import { parse } from '../http/validate.ts';
 import * as departments from '../services/departments.ts';
 import * as projects from '../services/projects.ts';
 import * as skills from '../services/skills.ts';
+import * as upgrades from '../services/upgrades.ts';
 import * as views from '../services/views.ts';
 import { proposeDeallocation } from '../services/assignments.ts';
 
@@ -129,5 +132,29 @@ export function structureRoutes(app: FastifyInstance, deps: RequestDeps, limits:
   });
   app.delete<SkillParams>('/api/me/skills/:skillId', async (request) =>
     skills.removeMySkill(mutating(request), request.params.skillId),
+  );
+
+  // ---- endorsements (Skill-03) and upgrade proposals (Project-11) ----
+  app.post<SkillParams>('/api/me/skills/:skillId/endorsements', async (request, reply) =>
+    created(
+      reply,
+      await skills.addEndorsement(
+        mutating(request),
+        request.params.skillId,
+        parse(AddEndorsementRequest, request.body),
+      ),
+    ),
+  );
+  app.delete<{ Params: { skillId: string; id: string } }>('/api/me/skills/:skillId/endorsements/:id', async (request) =>
+    skills.removeEndorsement(mutating(request), request.params.skillId, request.params.id),
+  );
+  app.get('/api/me/upgrade-proposals', async (request) => upgrades.listMyProposals(contextFor(request, deps)));
+  app.post<IdParams>('/api/me/upgrade-proposals/:id/accept', async (request) =>
+    upgrades.decideProposal(mutating(request), request.params.id, {
+      accept: parse(AcceptUpgradeRequest, request.body),
+    }),
+  );
+  app.post<IdParams>('/api/me/upgrade-proposals/:id/dismiss', async (request) =>
+    upgrades.decideProposal(mutating(request), request.params.id, { dismiss: true }),
   );
 }

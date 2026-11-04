@@ -42,6 +42,15 @@ export function sessionStore(database: Database) {
       await sessions.deleteMany({ orgId });
     },
 
+    /** Ids of every live org (background jobs walk them one by one through orgRepo). */
+    async listOrgIds(now: Date): Promise<{ id: string; isDemo: boolean; expiresAt?: Date }[]> {
+      const docs = await orgs
+        .find({ $or: [{ expiresAt: { $exists: false } }, { expiresAt: { $gt: now } }] })
+        .project<{ _id: string; isDemo: boolean; expiresAt?: Date }>({ isDemo: 1, expiresAt: 1 })
+        .toArray();
+      return docs.map((o) => ({ id: o._id, isDemo: o.isDemo, ...(o.expiresAt ? { expiresAt: o.expiresAt } : {}) }));
+    },
+
     async getOrg(orgId: string): Promise<OrgDoc | null> {
       return orgs.findOne({ _id: orgId });
     },

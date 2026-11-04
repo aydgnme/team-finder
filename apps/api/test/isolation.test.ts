@@ -60,6 +60,8 @@ interface Victim {
   /** A skill claim (Skill-04) and a notification (Notification-01), when the org has one. */
   claimId: string | null;
   notificationId: string | null;
+  /** Project-11: an open upgrade suggestion (demo seed only). */
+  upgradeId: string | null;
 }
 
 async function firstId(collection: string, orgId: string): Promise<string> {
@@ -82,6 +84,7 @@ async function demoVictim(): Promise<{ pm: Visitor; victim: Victim }> {
       categoryId: await firstId('skillCategories', pm.info.org.id),
       claimId: await firstId('userSkills', pm.info.org.id),
       notificationId: await firstId('notifications', pm.info.org.id),
+      upgradeId: await firstId('skillUpgradeProposals', pm.info.org.id),
     },
   };
 }
@@ -117,6 +120,7 @@ async function realVictim(): Promise<{ admin: Visitor; victim: Victim }> {
       categoryId: category.json().id,
       claimId: null,
       notificationId: null,
+      upgradeId: null,
     },
   };
 }
@@ -164,6 +168,23 @@ function attacks(v: Victim): [string, 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE
           ['reject a skill claim', 'POST', `/api/skills/claims/${v.claimId}/reject`, { version: 0 }],
         ] as [string, 'POST', string, unknown][])
       : []),
+    ...(v.upgradeId
+      ? ([
+          [
+            'accept an upgrade',
+            'POST',
+            `/api/me/upgrade-proposals/${v.upgradeId}/accept`,
+            { level: 5, experience: '7y+' },
+          ],
+          ['dismiss an upgrade', 'POST', `/api/me/upgrade-proposals/${v.upgradeId}/dismiss`, {}],
+        ] as [string, 'POST', string, unknown][])
+      : []),
+    [
+      'endorse with their project',
+      'POST',
+      `/api/me/skills/${v.skillId}/endorsements`,
+      { kind: 'project', projectId: v.projectId },
+    ],
     ...v.assignmentIds.map((id): [string, 'POST', string, unknown] => [
       `deallocate ${id}`,
       'POST',

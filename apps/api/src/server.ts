@@ -4,6 +4,8 @@ import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { connectDatabase, type Database } from './db/client.ts';
 import { ensureIndexes } from './db/indexes.ts';
+import { sessionStore } from './db/sessions.ts';
+import { runUpgradeJob } from './services/upgrades.ts';
 
 const config = loadConfig();
 let database: Database | undefined;
@@ -42,6 +44,25 @@ async function connectWithRetry(uri: string) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
+}
+
+// Project-11: the daily skill upgrade job, a minute after boot and then every 24 h. It is idempotent
+// (assignments record the last milestone handled), so restarts and several instances are safe.
+const DAY_MS = 24 * 60 * 60 * 1000;
+async function upgradeJobTick() {
+  if (!database) return;
+  try {
+    const report = await runUpgradeJob(database, sessionStore(database), new Date(), (orgId, err) =>
+      app.log.error({ err, orgId }, 'upgrade_job_org_failed'),
+    );
+    app.log.info(report, 'upgrade_job');
+  } catch (err) {
+    app.log.error({ err }, 'upgrade_job_failed');
+  }
+}
+if (config.upgradeJobEnabled) {
+  setTimeout(() => void upgradeJobTick(), 60_000).unref();
+  setInterval(() => void upgradeJobTick(), DAY_MS).unref();
 }
 
 const shutdown = async () => {

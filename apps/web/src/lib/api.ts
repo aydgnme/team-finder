@@ -1,5 +1,8 @@
 import {
   AiDraftResponse,
+  Endorsement,
+  UpgradeProposalsResponse,
+  type AddEndorsementRequest,
   MarkReadResponse,
   MySkill,
   NotificationsResponse,
@@ -213,6 +216,20 @@ export const api = {
       body: { version, reason },
     }),
   race: () => request(RaceResult, '/api/demo/race', { method: 'POST' }),
+  upgradeProposals: () => request(UpgradeProposalsResponse, '/api/me/upgrade-proposals'),
+  acceptUpgrade: (id: string, level: number, experience: Experience) =>
+    request(Ok, `/api/me/upgrade-proposals/${encodeURIComponent(id)}/accept`, {
+      method: 'POST',
+      body: { level, experience },
+    }),
+  dismissUpgrade: (id: string) =>
+    request(Ok, `/api/me/upgrade-proposals/${encodeURIComponent(id)}/dismiss`, { method: 'POST' }),
+  addEndorsement: (skillId: string, body: AddEndorsementRequest) =>
+    request(Endorsement, `/api/me/skills/${encodeURIComponent(skillId)}/endorsements`, { method: 'POST', body }),
+  removeEndorsement: (skillId: string, id: string) =>
+    request(Ok, `/api/me/skills/${encodeURIComponent(skillId)}/endorsements/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
   notifications: () => request(NotificationsResponse, '/api/notifications'),
   unreadCount: () => request(UnreadCountResponse, '/api/notifications/unread-count'),
   markRead: (body: MarkReadRequest) => request(MarkReadResponse, '/api/notifications/read', { method: 'POST', body }),
