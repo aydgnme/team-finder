@@ -1,5 +1,6 @@
 import {
   AiDraftResponse,
+  DepartmentStats,
   Endorsement,
   UpgradeProposalsResponse,
   type AddEndorsementRequest,
@@ -210,6 +211,7 @@ export const api = {
       `/api/departments/${encodeURIComponent(id)}/projects${status ? `?status=${encodeURIComponent(status)}` : ''}`,
     ),
   noApprover: () => request(NoApproverResponse, '/api/org/no-approver'),
+  departmentStats: (id: string) => request(DepartmentStats, `/api/departments/${encodeURIComponent(id)}/stats`),
   deallocate: (assignmentId: string, version: number, reason: string) =>
     request(AssignmentView, `/api/assignments/${encodeURIComponent(assignmentId)}/deallocate`, {
       method: 'POST',

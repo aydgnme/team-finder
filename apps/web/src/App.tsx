@@ -8,6 +8,7 @@ import { JoinPage, LoginPage, SignUpPage } from './components/AuthPages.tsx';
 import { DepartmentsPage } from './components/DepartmentsPage.tsx';
 import { OrgPage } from './components/OrgPage.tsx';
 import { InboxPage } from './components/InboxPage.tsx';
+import { StatsPage } from './components/StatsPage.tsx';
 import { RacePage } from './components/RacePage.tsx';
 import { ProjectsPage } from './components/ProjectsPage.tsx';
 import { SkillsPage } from './components/SkillsPage.tsx';
@@ -100,6 +101,8 @@ function DemoApp() {
         <ProjectPage key={route.projectId} projectId={route.projectId} />
       ) : route.name === 'person' ? (
         <PersonPage key={route.userId} userId={route.userId} session={info} />
+      ) : route.name === 'departmentStats' ? (
+        <StatsPage departmentId={route.departmentId} />
       ) : route.name === 'departmentProjects' ? (
         <DepartmentProjectsPage key={route.departmentId} departmentId={route.departmentId} />
       ) : route.name === 'projects' || !projectId ? (

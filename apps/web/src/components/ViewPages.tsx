@@ -245,6 +245,11 @@ export function DepartmentProjectsPage({ departmentId }: { departmentId: string 
         </select>
       </label>
       {data.isError && <p role="alert">{toErrorMessage(data.error)}</p>}
+      {d && (
+        <p>
+          <a href={href.departmentStats(d.department.id)}>{d.department.name}'s skills</a>
+        </p>
+      )}
       {d && d.projects.length === 0 && <p className="muted">No projects with members of {d.department.name}.</p>}
       {d && d.projects.length > 0 && (
         <ul className="project-list" data-testid="dept-projects">
