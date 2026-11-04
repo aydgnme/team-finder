@@ -59,9 +59,18 @@ async function demo() {
   const proposals = async (v: Visitor) =>
     UpgradeProposalsResponse.parse((await call(app, v, 'GET', '/api/me/upgrade-proposals')).json()).proposals;
   const mine = async (v: Visitor) => SkillsResponse.parse((await call(app, v, 'GET', '/api/skills')).json()).mine;
+  /** Names of the open suggestions of one person (read straight from the store). */
+  const openFor = async (first: string) => {
+    const docs = await database.db
+      .collection<{ skillId: string }>('skillUpgradeProposals')
+      .find({ orgId, userId: person(first), status: 'open' })
+      .toArray();
+    return docs.map((p) => skills.find((s) => s.id === p.skillId)?.name ?? '?').sort();
+  };
+  const totalOpen = () => database.db.collection('skillUpgradeProposals').countDocuments({ orgId, status: 'open' });
   const inbox = async (v: Visitor) =>
     NotificationsResponse.parse((await call(app, v, 'GET', '/api/notifications')).json());
-  return { pat, orgId, as, person, skill, project, repo, proposals, mine, inbox };
+  return { pat, orgId, as, person, skill, project, repo, proposals, mine, inbox, openFor, totalOpen };
 }
 
 describe('monthsBetween', () => {
@@ -84,12 +93,20 @@ describe('Project-11 upgrade job', () => {
     );
     expect(kaiOnOrion).toBe(3);
 
-    // The day before, Kai has not crossed 3 months yet. Mira lacks Go; Tom and Ines (also past a
-    // milestone) hold everything their projects use, so their milestones pass without a suggestion.
-    expect(await upgradeOrg(d.repo, later(-1))).toEqual({ assignments: 3, proposals: 1 });
+    // The day before, Kai has not crossed 3 months yet; Mira has, and lacks Go. Tom and Ines (also
+    // past a milestone) hold everything their projects use, so nothing is suggested to them.
+    await upgradeOrg(d.repo, later(-1));
+    expect(await d.openFor('Mira')).toEqual(['Go']);
+    expect(await d.openFor('Kai')).toEqual([]);
+    expect(await d.openFor('Tom')).toEqual([]);
+    expect(await d.openFor('Ines')).toEqual([]);
     // Today Kai crosses too (Go and PostgreSQL); Mira's milestone is already handled.
-    expect(await upgradeOrg(d.repo, NOW)).toEqual({ assignments: 1, proposals: 2 });
+    await upgradeOrg(d.repo, NOW);
+    expect(await d.openFor('Kai')).toEqual(['Go', 'PostgreSQL']);
+    expect(await d.openFor('Mira')).toEqual(['Go']);
+    const settled = await d.totalOpen();
     expect(await upgradeOrg(d.repo, NOW)).toEqual({ assignments: 0, proposals: 0 });
+    expect(await d.totalOpen()).toBe(settled);
 
     const [mira, kai] = [await d.as('Mira'), await d.as('Kai')];
     expect((await d.proposals(kai)).map((p) => p.skill.name).sort()).toEqual(['Go', 'PostgreSQL']);
@@ -105,11 +122,9 @@ describe('Project-11 upgrade job', () => {
       'CONFLICT_STALE',
     );
     expect(await d.proposals(mira)).toEqual([]);
-    expect(await upgradeOrg(d.repo, later(92))).toEqual({ assignments: 4, proposals: 1 });
+    await upgradeOrg(d.repo, later(92));
     expect((await d.proposals(mira)).map((p) => p.skill.name)).toEqual(['Go']);
-    expect(
-      await database.db.collection('skillUpgradeProposals').countDocuments({ orgId: d.orgId, status: 'open' }),
-    ).toBe(4);
+    expect(await d.openFor('Kai')).toEqual(['Go', 'PostgreSQL']);
   });
 
   it('suggests a raise when someone holds a skill below the project minimum', async () => {
@@ -126,21 +141,29 @@ describe('Project-11 upgrade job', () => {
 
   it('two runs at once create each suggestion once', async () => {
     const d = await demo();
+    const before = await d.totalOpen();
     const [a, b] = await Promise.all([upgradeOrg(d.repo, NOW), upgradeOrg(d.repo, NOW)]);
-    expect(a.proposals + b.proposals).toBe(3);
-    expect(
-      await database.db.collection('skillUpgradeProposals').countDocuments({ orgId: d.orgId, status: 'open' }),
-    ).toBe(4);
+    expect(await d.totalOpen()).toBe(before + a.proposals + b.proposals);
+    expect(await d.openFor('Kai')).toEqual(['Go', 'PostgreSQL']);
+    expect(await d.openFor('Mira')).toEqual(['Go']);
+    // Nothing left for a third run, and no person ever has the same skill suggested twice.
     expect(await upgradeOrg(d.repo, NOW)).toEqual({ assignments: 0, proposals: 0 });
+    const dupes = await database.db
+      .collection('skillUpgradeProposals')
+      .aggregate([
+        { $match: { orgId: d.orgId, status: 'open' } },
+        { $group: { _id: { u: '$userId', s: '$skillId' }, n: { $sum: 1 } } },
+        { $match: { n: { $gt: 1 } } },
+      ])
+      .toArray();
+    expect(dupes).toEqual([]);
   });
 
   it('runs over every live org, and an expired sandbox is skipped', async () => {
     const d = await demo();
     const report = await runUpgradeJob(database, sessionStore(database), NOW);
     expect(report.orgs).toBeGreaterThan(0);
-    expect(
-      await database.db.collection('skillUpgradeProposals').countDocuments({ orgId: d.orgId, status: 'open' }),
-    ).toBe(4);
+    expect(await d.openFor('Mira')).toEqual(['Go']);
     // Sandboxes live 24 h from their real creation time, whatever the test clock says.
     const orgs = await sessionStore(database).listOrgIds(new Date(Date.now() + 2 * 86_400_000));
     expect(orgs.some((o) => o.id === d.orgId)).toBe(false);

@@ -162,6 +162,7 @@ function attacks(v: Victim): [string, 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE
     ['read project details', 'GET', `/api/projects/${project}/details`],
     ["read someone's projects", 'GET', `/api/people/${v.userId}/projects`],
     ["read a department's projects", 'GET', `/api/departments/${v.departmentId}/projects`],
+    ["read a department's skill stats", 'GET', `/api/departments/${v.departmentId}/stats`],
     ...(v.claimId
       ? ([
           ['validate a skill claim', 'POST', `/api/skills/claims/${v.claimId}/validate`, { version: 0 }],

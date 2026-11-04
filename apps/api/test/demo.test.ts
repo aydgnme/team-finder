@@ -17,7 +17,8 @@ describe('POST /api/demo/sessions', () => {
     expect(v.info.landingProjectId).toEqual(expect.any(String));
     expect(v.info.personas.map((p) => p.name)).toEqual(['Pat Reyes', 'Dana Okafor', 'Ana Silva', 'Olivia Grant']);
     const users = await database.db.collection('users').countDocuments({ orgId: v.info.org.id });
-    expect(users).toBe(11); // 8 employees + PM + dept manager + org admin
+    // The Atlas cast (8 employees + PM + dept manager + org admin) and, since M5, the other practices.
+    expect(users).toBe(60);
   });
 
   it('stamps expiresAt on every document of the sandbox (TTL cleanup)', async () => {

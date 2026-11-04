@@ -65,6 +65,9 @@ export function structureRoutes(app: FastifyInstance, deps: RequestDeps, limits:
   app.get<IdParams & { Querystring: { status?: string } }>('/api/departments/:id/projects', async (request) =>
     views.departmentProjects(contextFor(request, deps), request.params.id, request.query.status),
   );
+  app.get<IdParams>('/api/departments/:id/stats', async (request) =>
+    views.departmentStats(contextFor(request, deps), request.params.id),
+  );
   app.get('/api/org/no-approver', async (request) => views.noApproverItems(contextFor(request, deps)));
   app.post<IdParams>('/api/skills/claims/:id/validate', async (request) =>
     skills.decideClaim(

@@ -2,7 +2,9 @@ import {
   can,
   fail,
   ProjectStatus,
+  skillStats,
   type DepartmentProjects,
+  type DepartmentStats,
   type PersonProjects,
   type ProjectDetails,
   type TeamMember,
@@ -178,5 +180,28 @@ export async function noApproverItems(ctx: ServiceContext) {
         project: { id: a.projectId, name: projectName.get(a.projectId) ?? 'Project' },
       })),
     skillClaims,
+  };
+}
+
+/** Stats-01: the skill landscape of a department, for its manager and admins (validated skills only). */
+export async function departmentStats(ctx: ServiceContext, departmentId: string): Promise<DepartmentStats> {
+  const { repo, actor } = ctx;
+  const dept = await repo.departments.findOne({ _id: departmentId });
+  if (!dept) fail('NOT_FOUND', { resource: 'department', id: departmentId });
+  if (!can(actor, 'department.viewProjects', { orgId: actor.orgId, managerId: dept!.managerId })) {
+    fail('FORBIDDEN', { action: "view this department's skills" });
+  }
+  const members = await repo.users.find({ departmentId: dept!._id }, { projection: { _id: 1 } });
+  const userSkills = await repo.userSkills.find({ userId: { $in: members.map((m) => m._id) }, validated: true });
+  const skillDocs = await repo.skills.find({ _id: { $in: unique(userSkills.map((s) => s.skillId)) } });
+  const categories = await repo.skillCategories.find({ _id: { $in: unique(skillDocs.map((s) => s.categoryId)) } });
+  const categoryName = new Map(categories.map((c) => [c._id, c.name]));
+  return {
+    department: { id: dept!._id, name: dept!.name },
+    ...skillStats({
+      members: members.map((m) => ({ id: m._id })),
+      userSkills,
+      skills: skillDocs.map((s) => ({ id: s._id, name: s.name, category: categoryName.get(s.categoryId) ?? '' })),
+    }),
   };
 }
